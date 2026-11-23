@@ -1,0 +1,2331 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>GTA Brasília - Versão 1.0</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Anton&family=Inter:wght@400;600;800&family=UnifrakturMaguntia&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; user-select: none; -webkit-user-select: none; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background: #140c06;
+      font-family: 'Inter', sans-serif;
+      touch-action: none;
+    }
+    .gta-title {
+      font-family: 'Anton', sans-serif;
+      letter-spacing: 0.03em;
+      text-shadow: -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000, 3px 3px 0 #000, 0 6px 14px rgba(0,0,0,0.85);
+    }
+    .gta-script {
+      font-family: 'UnifrakturMaguntia', cursive;
+      text-shadow: -3px -3px 0 #000, 3px -3px 0 #000, -3px 3px 0 #000, 3px 3px 0 #000, 0 6px 16px rgba(0,0,0,0.95);
+    }
+    #gameContainer {
+      position: fixed;
+      inset: 0;
+      width: 100vw;
+      height: 100vh;
+      z-index: 1;
+    }
+    .ctrl-btn {
+      transition: transform 0.08s ease, filter 0.1s ease;
+      box-shadow: 0 6px 0 rgba(0,0,0,0.65), 0 10px 20px rgba(0,0,0,0.45);
+      touch-action: none;
+    }
+    .ctrl-btn:active, .ctrl-btn.pressed {
+      transform: translateY(3px) scale(0.96);
+      filter: brightness(1.18);
+    }
+    @keyframes pulseGold {
+      0%, 100% { box-shadow: 0 0 12px rgba(250, 204, 21, 0.5); }
+      50% { box-shadow: 0 0 26px rgba(250, 204, 21, 0.95); }
+    }
+    .gold-glow { animation: pulseGold 2s infinite; }
+    .custom-scroll::-webkit-scrollbar { width: 6px; }
+    .custom-scroll::-webkit-scrollbar-thumb { background: #f59e0b; border-radius: 9999px; }
+  </style>
+</head>
+<body>
+  <!-- Container 3D Principal -->
+  <div id="gameContainer"></div>
+
+  <!-- TELA DE CARREGAMENTO -->
+  <div id="loadingScreen" class="fixed inset-0 z-50 flex flex-col justify-between bg-[#1b1108] overflow-hidden">
+    <canvas id="loadingArtCanvas" class="absolute inset-0 w-full h-full object-cover"></canvas>
+
+    <div class="relative z-10 flex flex-col justify-between h-full pointer-events-none">
+      <!-- Topo com Título GTA Brasília -->
+      <div class="p-4 sm:p-8 flex flex-col sm:flex-row justify-between items-start gap-3">
+        <div>
+          <div class="inline-block bg-amber-400 text-black font-black text-xs sm:text-sm px-3 py-1 rounded-full uppercase tracking-widest mb-1 shadow-lg">
+            Versão 1.0 • Distrito Federal & Estados
+          </div>
+          <h1 class="gta-title text-4xl sm:text-6xl text-white leading-none uppercase">
+            Grand Theft Auto
+          </h1>
+          <div class="flex items-baseline gap-2 -mt-1">
+            <span class="gta-script text-5xl sm:text-7xl text-white">Brasília</span>
+            <span class="gta-title text-2xl sm:text-3xl text-amber-400">v1.0</span>
+          </div>
+        </div>
+
+        <button id="btnSkipLoad" class="pointer-events-auto bg-emerald-500 hover:bg-emerald-400 text-black font-extrabold px-5 py-3 rounded-2xl border-2 border-black shadow-xl text-sm sm:text-base uppercase tracking-wider cursor-pointer">
+          ▶ Entrar em Brasília
+        </button>
+      </div>
+
+      <!-- Barra de Carregamento -->
+      <div class="w-full max-w-2xl px-6 pb-8 pointer-events-auto">
+        <div class="flex justify-between items-end mb-2">
+          <div>
+            <span class="text-xs font-bold uppercase tracking-widest text-amber-400">Edição 3D • Versão 1.0 • Eixo Monumental</span>
+            <p id="loadingStatus" class="text-sm sm:text-base font-bold text-white drop-shadow">Carregando Congresso Nacional, Esplanada e Polícia Federal...</p>
+          </div>
+          <span id="loadingPercent" class="gta-title text-2xl sm:text-3xl text-amber-400">0%</span>
+        </div>
+        <div class="w-full h-4 bg-black/80 rounded-full p-1 border border-amber-400/60 overflow-hidden shadow-2xl">
+          <div id="loadingBar" class="h-full bg-gradient-to-r from-amber-500 via-yellow-400 to-emerald-400 rounded-full transition-all duration-150" style="width: 0%"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- HUD DO JOGO -->
+  <div id="gameHUD" class="hidden fixed inset-0 z-30 pointer-events-none">
+    <!-- Barra Superior -->
+    <div class="flex flex-wrap justify-between items-start gap-2 p-3 sm:p-4">
+      <!-- Status do Jogador -->
+      <div class="bg-black/75 backdrop-blur-md border border-white/15 rounded-2xl p-2.5 sm:p-3 text-white pointer-events-auto shadow-xl min-w-[210px]">
+        <div class="flex items-center justify-between gap-2 mb-1">
+          <span id="locationBadge" class="bg-emerald-600/90 text-white text-[10px] sm:text-xs font-extrabold uppercase tracking-wider px-2.5 py-0.5 rounded-full">Brasília - DF • v1.0</span>
+          <span id="wantedStars" class="text-sm sm:text-base tracking-widest text-zinc-500">☆☆☆☆☆</span>
+        </div>
+        <div class="flex items-center justify-between gap-3">
+          <span class="text-emerald-400 font-black text-base sm:text-lg" id="moneyDisplay">R$ 2.500</span>
+          <span class="text-amber-300 font-bold text-xs" id="missionDisplay">Checkpoints: 0</span>
+        </div>
+        <!-- Barra de Vida -->
+        <div class="mt-1.5">
+          <div class="flex justify-between text-[10px] font-bold uppercase text-zinc-300 mb-0.5">
+            <span>❤️ Vida do Gato</span>
+            <span id="healthText">100%</span>
+          </div>
+          <div class="w-full h-2.5 bg-zinc-800 rounded-full overflow-hidden border border-white/10">
+            <div id="healthBar" class="h-full bg-gradient-to-r from-red-500 via-emerald-400 to-emerald-500 transition-all duration-150" style="width: 100%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Botões Superiores (Correr/Nitro no Topo + GPS + Câmera) -->
+      <div class="flex flex-wrap items-center gap-2 pointer-events-auto">
+        <button id="btnCornSoup" class="ctrl-btn bg-yellow-400 hover:bg-yellow-300 text-black font-black text-xs sm:text-sm px-3.5 py-2.5 rounded-2xl border-2 border-black cursor-pointer">
+          🌽 CALDO DE MILHO (+VIDA)
+        </button>
+        <button id="btnSprintTop" class="ctrl-btn bg-amber-500 hover:bg-amber-400 text-black font-black text-xs sm:text-sm px-3.5 py-2.5 rounded-2xl border-2 border-black cursor-pointer">
+          ⚡ CORRER / NITRO: OFF
+        </button>
+        <button id="btnOpenMap" class="ctrl-btn bg-sky-500 hover:bg-sky-400 text-black font-black text-xs sm:text-sm px-3.5 py-2.5 rounded-2xl border-2 border-black cursor-pointer">
+          🗺️ GPS ESTADOS (M)
+        </button>
+        <button id="btnGoHome" class="ctrl-btn bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs sm:text-sm px-3.5 py-2.5 rounded-2xl border-2 border-black cursor-pointer">
+          🏠 MINHA CASA
+        </button>
+        <button id="btnCameraView" class="ctrl-btn bg-zinc-800 hover:bg-zinc-700 text-white font-bold text-xs sm:text-sm px-3 py-2.5 rounded-2xl border border-white/20 cursor-pointer">
+          🎥 CÂMERA (C)
+        </button>
+      </div>
+    </div>
+
+    <!-- Banner de Notificação Central -->
+    <div id="toastBanner" class="hidden fixed top-24 left-1/2 -translate-x-1/2 z-40 bg-black/85 border-2 border-amber-400 text-white px-5 py-2.5 rounded-2xl shadow-2xl text-center max-w-[90vw]">
+      <p id="toastText" class="font-extrabold text-sm sm:text-base text-amber-300"></p>
+    </div>
+
+    <!-- Botão Interativo Contextual (Entrar na Casa / Falar e Pegar Comida do Pai Noversal / Jogar no Quarto / Sair de Casa) -->
+    <div id="houseActionBox" class="hidden fixed bottom-52 left-1/2 -translate-x-1/2 z-40 pointer-events-auto">
+      <button id="btnHouseAction" class="ctrl-btn gold-glow bg-emerald-500 hover:bg-emerald-400 text-black font-black text-sm sm:text-base px-5 py-3 rounded-2xl border-2 border-black shadow-2xl uppercase cursor-pointer">
+        🚪 ENTRAR NA MINHA CASA
+      </button>
+    </div>
+
+    <!-- Minimapa / Planta Interna da Casa (Aparece quando você entra na casa) -->
+    <div id="houseMapCard" class="hidden fixed top-28 right-3 z-40 bg-black/85 backdrop-blur-md border-2 border-emerald-400 rounded-2xl p-2.5 text-white shadow-2xl pointer-events-auto">
+      <div class="flex items-center justify-between gap-2 mb-1">
+        <span class="text-[10px] font-black uppercase tracking-wider text-emerald-400">🗺️ Mapa da Minha Casa</span>
+        <button id="btnExitHouseTop" class="bg-red-600 hover:bg-red-500 text-white text-[10px] font-black px-2 py-0.5 rounded-lg cursor-pointer">SAIR</button>
+      </div>
+      <canvas id="houseMapCanvas" width="160" height="130" class="rounded-xl border border-white/15 bg-zinc-900"></canvas>
+      <p id="houseRoomLabel" class="text-[10px] font-bold text-amber-300 mt-1 text-center">Sala & Cozinha do Pai Noversal</p>
+    </div>
+
+    <!-- Modal de Conversa / Advertência na 1ª Abordagem da Polícia Federal -->
+    <div id="pfWarningModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pointer-events-auto">
+      <div class="bg-zinc-900 border-2 border-amber-400 rounded-3xl p-6 max-w-md w-full text-center shadow-2xl">
+        <div class="inline-block bg-amber-400 text-black font-black text-xs px-3 py-1 rounded-full uppercase mb-2">🚔 Abordagem • Polícia Federal</div>
+        <h2 class="gta-title text-2xl sm:text-3xl text-white uppercase mb-2">Agente da Polícia Federal</h2>
+        <div class="bg-black/60 border border-white/15 rounded-2xl p-4 mb-4 text-left">
+          <p class="text-xs font-bold text-amber-400 uppercase mb-1">👮 Policial Federal fala:</p>
+          <p class="text-sm sm:text-base text-white font-semibold leading-relaxed">
+            "Na próxima vez você vai ser preso. Dessa vez escapou, mas na próxima vez você vai preso, tá bom?"
+          </p>
+        </div>
+        <button id="btnAcceptWarning" class="ctrl-btn w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3.5 px-4 rounded-2xl border-2 border-black uppercase text-sm sm:text-base cursor-pointer">
+          🗣️ "Tá bom, seu policial! Tô indo embora."
+        </button>
+      </div>
+    </div>
+
+    <!-- Botão Especial de Fuga da Prisão (Aparece quando preso na PF na 2ª vez) -->
+    <div id="prisonEscapeBox" class="hidden fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-auto text-center bg-black/90 border-2 border-amber-400 rounded-3xl p-5 shadow-2xl max-w-sm w-[92vw]">
+      <div class="text-3xl mb-1">🚔⛓️</div>
+      <h2 class="gta-title text-2xl sm:text-3xl text-amber-400 uppercase">Preso na Polícia Federal!</h2>
+      <div id="prisonDaysBadge" class="inline-block bg-red-600 text-white font-black text-xs sm:text-sm px-3 py-1 rounded-full uppercase mt-1 mb-2">
+        Pena: 10 Dias na Prisão
+      </div>
+      <p id="prisonDescText" class="text-xs sm:text-sm text-zinc-200 mb-4">
+        Você já tinha sido avisado e fez cagada de novo! Cumpra os dias na cela ou dê um Golpe de Estado para arrombar as grades!
+      </p>
+      <button id="btnCoupEscape" class="ctrl-btn gold-glow w-full bg-gradient-to-r from-amber-500 to-yellow-400 text-black font-black text-sm sm:text-base py-3.5 px-4 rounded-2xl border-2 border-black uppercase cursor-pointer">
+        💥 DAR GOLPE DE ESTADO E FUGIR!
+      </button>
+    </div>
+
+    <!-- Modal SAMU 192 (Quando a vida chega a 0) -->
+    <div id="samuModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pointer-events-auto">
+      <div class="bg-zinc-900 border-2 border-red-500 rounded-3xl p-6 max-w-md w-full text-center shadow-2xl">
+        <div class="inline-block bg-red-600 text-white font-black text-xs px-3 py-1 rounded-full uppercase mb-2">SAMU 192 • Brasília - DF</div>
+        <h2 class="gta-title text-3xl sm:text-4xl text-red-500 uppercase mb-2">SE DEU MAL!</h2>
+        <p id="samuMessage" class="text-sm sm:text-base text-zinc-200 mb-5">
+          🚑 Socorrista do SAMU: "Calma aí, parceiro! Fizemos os primeiros socorros no Eixo Monumental. Você já tá pronto pra voltar pra rua!"
+        </p>
+        <button id="btnSamuRevive" class="ctrl-btn w-full bg-emerald-500 hover:bg-emerald-400 text-black font-black py-3.5 rounded-2xl border-2 border-black uppercase text-sm sm:text-base cursor-pointer">
+          🏥 SAIR DO HOSPITAL DO SAMU
+        </button>
+      </div>
+    </div>
+
+    <!-- Controles Inferiores -->
+    <div class="fixed bottom-3 left-3 right-3 flex justify-between items-end pointer-events-none">
+      <!-- D-Pad Direcional Limpo (Apenas Frente, Trás, Esquerda, Direita) -->
+      <div class="grid grid-cols-3 gap-2 w-44 h-44 sm:w-48 sm:h-48 pointer-events-auto">
+        <div></div>
+        <button id="btnUp" class="ctrl-btn bg-zinc-900/90 border-2 border-white/25 rounded-2xl flex items-center justify-center text-white text-2xl font-black cursor-pointer">▲</button>
+        <div></div>
+        <button id="btnLeft" class="ctrl-btn bg-zinc-900/90 border-2 border-white/25 rounded-2xl flex items-center justify-center text-white text-2xl font-black cursor-pointer">◄</button>
+        <div class="bg-black/40 rounded-2xl border border-white/10 flex items-center justify-center text-[10px] font-bold text-zinc-400">ANDAR</div>
+        <button id="btnRight" class="ctrl-btn bg-zinc-900/90 border-2 border-white/25 rounded-2xl flex items-center justify-center text-white text-2xl font-black cursor-pointer">►</button>
+        <div></div>
+        <button id="btnDown" class="ctrl-btn bg-zinc-900/90 border-2 border-white/25 rounded-2xl flex items-center justify-center text-white text-2xl font-black cursor-pointer">▼</button>
+        <div></div>
+      </div>
+
+      <!-- Botões de Ação à Direita -->
+      <div class="flex flex-col items-end gap-2.5 pointer-events-auto">
+        <div class="flex items-center gap-2">
+          <button id="btnJump" class="ctrl-btn bg-sky-500 hover:bg-sky-400 text-black font-black text-xs sm:text-sm px-4 py-3.5 rounded-2xl border-2 border-black cursor-pointer">
+            ⬆️ PULAR
+          </button>
+          <button id="btnCar" class="ctrl-btn bg-emerald-500 hover:bg-emerald-400 text-black font-black text-xs sm:text-sm px-4 py-3.5 rounded-2xl border-2 border-black cursor-pointer">
+            🚗 CARRO (E)
+          </button>
+        </div>
+        <button id="btnPunch" class="ctrl-btn bg-gradient-to-r from-red-600 to-orange-500 hover:from-red-500 hover:to-orange-400 text-white font-black text-sm sm:text-base px-6 py-4 rounded-2xl border-2 border-black shadow-2xl cursor-pointer">
+          🐾 DAR MURRO (F)
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL GPS DE ESTADOS & CIDADES -->
+  <div id="mapModal" class="hidden fixed inset-0 z-50 bg-black/80 backdrop-blur-md flex items-center justify-center p-4">
+    <div class="bg-zinc-900 border-2 border-amber-400 rounded-3xl p-5 max-w-2xl w-full max-h-[85vh] flex flex-col shadow-2xl">
+      <div class="flex justify-between items-center mb-3">
+        <div>
+          <h2 class="gta-title text-2xl sm:text-3xl text-amber-400 uppercase">GPS Brasília, Estados & Continentes</h2>
+          <p class="text-xs text-zinc-300">Escolha um destino para viajar na hora ou siga as placas pelas rodovias!</p>
+        </div>
+        <button id="btnCloseMap" class="bg-red-600 hover:bg-red-500 text-white font-black px-3.5 py-2 rounded-xl text-sm cursor-pointer">✕</button>
+      </div>
+      <div id="regionsGrid" class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 overflow-y-auto custom-scroll pr-1"></div>
+    </div>
+  </div>
+
+  <script>
+    // =========================================================================
+    // 1. ARTE DA TELA DE CARREGAMENTO (GATO FRAJOLA + CONGRESSO NACIONAL BRASÍLIA)
+    // =========================================================================
+    const loadingCanvas = document.getElementById('loadingArtCanvas');
+    const lctx = loadingCanvas.getContext('2d');
+
+    function drawLoadingArt() {
+      const w = loadingCanvas.width = window.innerWidth;
+      const h = loadingCanvas.height = window.innerHeight;
+
+      // Céu pôr do sol dourado estilo Brasília
+      const skyGrad = lctx.createLinearGradient(0, 0, 0, h);
+      skyGrad.addColorStop(0, '#2a180a');
+      skyGrad.addColorStop(0.45, '#b45309');
+      skyGrad.addColorStop(0.75, '#f59e0b');
+      skyGrad.addColorStop(1, '#fef08a');
+      lctx.fillStyle = skyGrad;
+      lctx.fillRect(0, 0, w, h);
+
+      // Sol no horizonte
+      lctx.fillStyle = 'rgba(255, 250, 210, 0.85)';
+      lctx.beginPath();
+      lctx.arc(w * 0.55, h * 0.56, Math.min(w, h) * 0.14, 0, Math.PI * 2);
+      lctx.fill();
+
+      // Silhueta do Congresso Nacional (Duas Torres + Dois Pratos) e Ministérios
+      const baseY = h * 0.72;
+      lctx.fillStyle = 'rgba(38, 24, 14, 0.78)';
+      // Esplanada base
+      lctx.fillRect(w * 0.1, baseY, w * 0.8, h * 0.04);
+      // Duas Torres Gêmeas
+      lctx.fillRect(w * 0.45, baseY - h * 0.25, w * 0.028, h * 0.25);
+      lctx.fillRect(w * 0.488, baseY - h * 0.25, w * 0.028, h * 0.25);
+      // Prato virado para baixo (Senado - esquerda)
+      lctx.beginPath();
+      lctx.arc(w * 0.39, baseY, w * 0.05, Math.PI, 0);
+      lctx.fill();
+      // Prato virado para cima (Câmara - direita)
+      lctx.beginPath();
+      lctx.arc(w * 0.575, baseY - h * 0.035, w * 0.055, 0, Math.PI);
+      lctx.fill();
+
+      // Mapa estilizado do DF no canto superior esquerdo
+      const mapX = w * 0.15;
+      const mapY = h * 0.36;
+      const mapW = Math.min(w * 0.22, 180);
+      const mapH = mapW * 0.65;
+      lctx.save();
+      lctx.fillStyle = '#ffffff';
+      lctx.strokeStyle = '#000000';
+      lctx.lineWidth = 4;
+      lctx.fillRect(mapX - mapW / 2, mapY - mapH / 2, mapW, mapH);
+      lctx.strokeRect(mapX - mapW / 2, mapY - mapH / 2, mapW, mapH);
+      // Cruz de Brasília no centro do mapa DF
+      lctx.fillStyle = '#15803d';
+      lctx.fillRect(mapX - mapW * 0.14, mapY - mapH * 0.22, mapW * 0.28, mapH * 0.44);
+      lctx.fillStyle = '#facc15';
+      lctx.fillRect(mapX - mapW * 0.03, mapY - mapH * 0.16, mapW * 0.06, mapH * 0.32);
+      lctx.fillRect(mapX - mapW * 0.1, mapY - mapH * 0.04, mapW * 0.2, mapH * 0.08);
+      lctx.restore();
+
+      // Personagem Gato Frajola estilizado à direita (boné branco, óculos escuros, corrente de ouro)
+      const catX = w * 0.78;
+      const catY = h * 0.64;
+      const sc = Math.min(w, h) / 620;
+      lctx.save();
+      lctx.translate(catX, catY);
+      lctx.scale(sc, sc);
+
+      // Camisa branca
+      lctx.fillStyle = '#f8fafc';
+      lctx.strokeStyle = '#000';
+      lctx.lineWidth = 6;
+      lctx.beginPath();
+      lctx.roundRect(-125, 65, 250, 220, 40);
+      lctx.fill();
+      lctx.stroke();
+
+      // Corrente de ouro
+      lctx.strokeStyle = '#facc15';
+      lctx.lineWidth = 14;
+      lctx.beginPath();
+      lctx.arc(0, 88, 68, 0.15 * Math.PI, 0.85 * Math.PI);
+      lctx.stroke();
+      lctx.strokeStyle = '#000';
+      lctx.lineWidth = 3;
+      lctx.beginPath();
+      lctx.arc(0, 88, 75, 0.15 * Math.PI, 0.85 * Math.PI);
+      lctx.stroke();
+
+      // Cabeça preta e branca do gato
+      lctx.fillStyle = '#111827';
+      lctx.beginPath();
+      lctx.arc(0, -25, 92, 0, Math.PI * 2);
+      lctx.fill();
+      lctx.strokeStyle = '#000';
+      lctx.lineWidth = 6;
+      lctx.stroke();
+
+      // Orelhas
+      lctx.beginPath();
+      lctx.moveTo(-78, -75); lctx.lineTo(-92, -155); lctx.lineTo(-26, -108);
+      lctx.closePath(); lctx.fill(); lctx.stroke();
+      lctx.beginPath();
+      lctx.moveTo(78, -75); lctx.lineTo(92, -155); lctx.lineTo(26, -108);
+      lctx.closePath(); lctx.fill(); lctx.stroke();
+
+      // Focinho branco
+      lctx.fillStyle = '#ffffff';
+      lctx.beginPath();
+      lctx.ellipse(0, 12, 54, 42, 0, 0, Math.PI * 2);
+      lctx.fill();
+
+      // Nariz rosa
+      lctx.fillStyle = '#f472b6';
+      lctx.beginPath();
+      lctx.moveTo(-11, -4); lctx.lineTo(11, -4); lctx.lineTo(0, 10);
+      lctx.closePath(); lctx.fill();
+
+      // Óculos escuros GTA
+      lctx.fillStyle = '#09090b';
+      lctx.strokeStyle = '#ffffff';
+      lctx.lineWidth = 3;
+      lctx.beginPath();
+      lctx.roundRect(-78, -48, 68, 36, 8);
+      lctx.roundRect(10, -48, 68, 36, 8);
+      lctx.fill();
+      lctx.stroke();
+      lctx.fillRect(-12, -38, 24, 8);
+
+      // Boné branco
+      lctx.fillStyle = '#ffffff';
+      lctx.strokeStyle = '#000';
+      lctx.lineWidth = 6;
+      lctx.beginPath();
+      lctx.arc(0, -68, 86, Math.PI, 0);
+      lctx.fill();
+      lctx.stroke();
+      lctx.beginPath();
+      lctx.ellipse(-18, -68, 105, 18, -0.08, 0, Math.PI * 2);
+      lctx.fill();
+      lctx.stroke();
+
+      lctx.restore();
+
+      // Rodapé com Versão 1.0
+      lctx.fillStyle = 'rgba(0,0,0,0.75)';
+      lctx.fillRect(0, h - 42, w, 42);
+      lctx.fillStyle = '#fbbf24';
+      lctx.font = 'bold 14px Inter, sans-serif';
+      lctx.textAlign = 'left';
+      lctx.fillText('CONGRESSO NACIONAL • ESPLANADA • VERSÃO 1.0', 22, h - 16);
+    }
+    drawLoadingArt();
+    window.addEventListener('resize', drawLoadingArt);
+
+    // =========================================================================
+    // 2. ÁUDIO SINTÉTICO (SIRENE PF, MURRO, MOTOR, COLETA)
+    // =========================================================================
+    const sound = {
+      ctx: null,
+      init() {
+        if (!this.ctx) {
+          const AC = window.AudioContext || window.webkitAudioContext;
+          if (AC) this.ctx = new AC();
+        }
+      },
+      playTone(freq, type = 'sine', dur = 0.15, vol = 0.12) {
+        try {
+          this.init();
+          if (!this.ctx) return;
+          const osc = this.ctx.createOscillator();
+          const gain = this.ctx.createGain();
+          osc.type = type;
+          osc.frequency.setValueAtTime(freq, this.ctx.currentTime);
+          gain.gain.setValueAtTime(vol, this.ctx.currentTime);
+          gain.gain.exponentialRampToValueAtTime(0.001, this.ctx.currentTime + dur);
+          osc.connect(gain);
+          gain.connect(this.ctx.destination);
+          osc.start();
+          osc.stop(this.ctx.currentTime + dur);
+        } catch (e) {}
+      },
+      punch() { this.playTone(130, 'triangle', 0.14, 0.25); },
+      coin() {
+        this.playTone(660, 'sine', 0.1, 0.15);
+        setTimeout(() => this.playTone(990, 'sine', 0.16, 0.15), 70);
+      },
+      siren() {
+        this.playTone(720, 'sawtooth', 0.22, 0.08);
+        setTimeout(() => this.playTone(540, 'sawtooth', 0.22, 0.08), 220);
+      }
+    };
+
+    // =========================================================================
+    // 3. CENA 3D THREE.JS (BRASÍLIA + GOIÂNIA + MINAS + PARANÁ + ESTADOS)
+    // =========================================================================
+    const container = document.getElementById('gameContainer');
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0xd97724);
+    scene.fog = new THREE.FogExp2(0xd97724, 0.0014);
+
+    const camera = new THREE.PerspectiveCamera(62, window.innerWidth / window.innerHeight, 0.5, 1600);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setSize(window.innerWidth, window.innerHeight);
+    renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    renderer.shadowMap.enabled = true;
+    container.appendChild(renderer.domElement);
+
+    // Iluminação Pôr do Sol Dourado de Brasília
+    const hemiLight = new THREE.HemisphereLight(0xffedd5, 0x3f6212, 0.95);
+    scene.add(hemiLight);
+
+    const sunLight = new THREE.DirectionalLight(0xfef08a, 1.35);
+    sunLight.position.set(0, 140, -320);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 2048;
+    sunLight.shadow.mapSize.height = 2048;
+    scene.add(sunLight);
+
+    // Sol brilhante no horizonte
+    const sunDisc = new THREE.Mesh(
+      new THREE.SphereGeometry(38, 24, 24),
+      new THREE.MeshBasicMaterial({ color: 0xfef9c3 })
+    );
+    sunDisc.position.set(0, 95, -620);
+    scene.add(sunDisc);
+
+    // Chão Base Gigante
+    const groundMat = new THREE.MeshLambertMaterial({ color: 0x4d7c0f });
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(3600, 3600), groundMat);
+    ground.rotation.x = -Math.PI / 2;
+    ground.receiveShadow = true;
+    scene.add(ground);
+
+    // Helper para criar placas 3D com texto
+    function createSignBoard(text, bgColor, textColor, x, y, z, rotY = 0, width = 18, height = 5) {
+      const c = document.createElement('canvas');
+      c.width = 512;
+      c.height = 160;
+      const cx = c.getContext('2d');
+      cx.fillStyle = bgColor;
+      cx.fillRect(0, 0, 512, 160);
+      cx.strokeStyle = '#ffffff';
+      cx.lineWidth = 10;
+      cx.strokeRect(8, 8, 496, 144);
+      cx.fillStyle = textColor;
+      cx.font = 'bold 34px Inter, sans-serif';
+      cx.textAlign = 'center';
+      cx.textBaseline = 'middle';
+      cx.fillText(text, 256, 80);
+
+      const tex = new THREE.CanvasTexture(c);
+      const group = new THREE.Group();
+      const board = new THREE.Mesh(
+        new THREE.BoxGeometry(width, height, 0.5),
+        new THREE.MeshLambertMaterial({ map: tex })
+      );
+      board.position.y = y;
+      group.add(board);
+
+      const postMat = new THREE.MeshLambertMaterial({ color: 0x94a3b8 });
+      const p1 = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, y), postMat);
+      p1.position.set(-width * 0.4, y / 2, 0);
+      const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.25, y), postMat);
+      p2.position.set(width * 0.4, y / 2, 0);
+      group.add(p1, p2);
+
+      group.position.set(x, 0, z);
+      group.rotation.y = rotY;
+      scene.add(group);
+      return group;
+    }
+
+    // Helper para estradas asfaltadas
+    function createRoad(x, z, w, l, color = 0x27272a) {
+      const road = new THREE.Mesh(
+        new THREE.BoxGeometry(w, 0.18, l),
+        new THREE.MeshLambertMaterial({ color })
+      );
+      road.position.set(x, 0.09, z);
+      road.receiveShadow = true;
+      scene.add(road);
+
+      // Faixa central amarela
+      const stripe = new THREE.Mesh(
+        new THREE.BoxGeometry(w > l ? w * 0.96 : 0.45, 0.22, l > w ? l * 0.96 : 0.45),
+        new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+      );
+      stripe.position.set(x, 0.11, z);
+      scene.add(stripe);
+    }
+
+    // =========================================================================
+    // 4. CONSTRUÇÃO DE BRASÍLIA (EIXO MONUMENTAL + CONGRESSO + ESPLANADA + LAGO JK)
+    // =========================================================================
+    function buildBrasilia() {
+      // Gramado central do Eixo Monumental (igual à foto)
+      const eixoLawn = new THREE.Mesh(
+        new THREE.BoxGeometry(56, 0.24, 340),
+        new THREE.MeshLambertMaterial({ color: 0x65a30d })
+      );
+      eixoLawn.position.set(0, 0.12, -30);
+      scene.add(eixoLawn);
+
+      // Duas Avenidas Paralelas do Eixo Monumental
+      createRoad(-38, -30, 18, 360);
+      createRoad(38, -30, 18, 360);
+      // Avenidas transversais do Quadrado do DF
+      createRoad(0, 130, 320, 18);
+      createRoad(0, -180, 320, 18);
+      createRoad(-155, -25, 18, 320);
+      createRoad(155, -25, 18, 320);
+
+      // Espelho d'água em frente ao Congresso Nacional
+      const mirrorPool = new THREE.Mesh(
+        new THREE.BoxGeometry(44, 0.28, 38),
+        new THREE.MeshPhongMaterial({ color: 0x38bdf8, shininess: 90 })
+      );
+      mirrorPool.position.set(0, 0.14, -108);
+      scene.add(mirrorPool);
+
+      // CONGRESSO NACIONAL (Base + Duas Torres Gêmeas + Dois Pratos)
+      const congressGroup = new THREE.Group();
+      const whiteConcrete = new THREE.MeshLambertMaterial({ color: 0xf8fafc });
+      const glassMat = new THREE.MeshPhongMaterial({ color: 0x0ea5e9, shininess: 80 });
+
+      // Plataforma Horizontal
+      const platform = new THREE.Mesh(new THREE.BoxGeometry(66, 6, 26), whiteConcrete);
+      platform.position.set(0, 3, 0);
+      congressGroup.add(platform);
+
+      // Duas Torres Gêmeas (Anexo I)
+      const tower1 = new THREE.Mesh(new THREE.BoxGeometry(6.5, 48, 12), whiteConcrete);
+      tower1.position.set(-5.2, 27, -2);
+      const tower2 = new THREE.Mesh(new THREE.BoxGeometry(6.5, 48, 12), whiteConcrete);
+      tower2.position.set(5.2, 27, -2);
+      congressGroup.add(tower1, tower2);
+
+      // Janelas nas torres
+      const win1 = new THREE.Mesh(new THREE.BoxGeometry(6.7, 44, 9), glassMat);
+      win1.position.set(-5.2, 27, -2);
+      const win2 = new THREE.Mesh(new THREE.BoxGeometry(6.7, 44, 9), glassMat);
+      win2.position.set(5.2, 27, -2);
+      congressGroup.add(win1, win2);
+
+      // Prato Virado para Baixo (Senado - Esquerda)
+      const domeDown = new THREE.Mesh(
+        new THREE.SphereGeometry(11, 24, 16, 0, Math.PI * 2, 0, Math.PI / 2),
+        whiteConcrete
+      );
+      domeDown.position.set(-19, 6, 2);
+      congressGroup.add(domeDown);
+
+      // Prato Virado para Cima (Câmara - Direita)
+      const bowlUp = new THREE.Mesh(
+        new THREE.SphereGeometry(13.5, 24, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2),
+        whiteConcrete
+      );
+      bowlUp.position.set(19, 14, 2);
+      congressGroup.add(bowlUp);
+
+      congressGroup.position.set(0, 0, -142);
+      scene.add(congressGroup);
+
+      // Esplanada dos Ministérios (Lado Esquerdo e Direito)
+      for (let i = 0; i < 5; i++) {
+        const zPos = -75 + i * 42;
+        // Bloco Esquerdo (incluindo estilo Palácio da Justiça com arcos)
+        const minL = new THREE.Mesh(
+          new THREE.BoxGeometry(24, 14, 16),
+          new THREE.MeshLambertMaterial({ color: i === 0 ? 0x78716c : 0x94a3b8 })
+        );
+        minL.position.set(-66, 7, zPos);
+        scene.add(minL);
+
+        // Bloco Direito (incluindo prédio amarelo dourado igual à foto!)
+        const minR = new THREE.Mesh(
+          new THREE.BoxGeometry(24, 14, 16),
+          new THREE.MeshLambertMaterial({ color: i === 1 ? 0xeab308 : 0x64748b })
+        );
+        minR.position.set(66, 7, zPos);
+        scene.add(minR);
+      }
+
+      // Catedral Metropolitana de Brasília
+      const catGroup = new THREE.Group();
+      for (let i = 0; i < 12; i++) {
+        const ang = (i / 12) * Math.PI * 2;
+        const rib = new THREE.Mesh(
+          new THREE.BoxGeometry(1.1, 18, 2.2),
+          whiteConcrete
+        );
+        rib.position.set(Math.cos(ang) * 7, 9, Math.sin(ang) * 7);
+        rib.rotation.y = -ang;
+        rib.rotation.z = 0.25;
+        catGroup.add(rib);
+      }
+      catGroup.position.set(-66, 0, 105);
+      scene.add(catGroup);
+
+      // Lago Paranoá & Ponte JK ao fundo
+      const lake = new THREE.Mesh(
+        new THREE.BoxGeometry(900, 0.2, 160),
+        new THREE.MeshPhongMaterial({ color: 0x0284c7, shininess: 95 })
+      );
+      lake.position.set(0, 0.1, -310);
+      scene.add(lake);
+
+      // Arcos da Ponte JK
+      for (let a = -1; a <= 1; a++) {
+        const arch = new THREE.Mesh(
+          new THREE.TorusGeometry(24, 1.2, 8, 24, Math.PI),
+          whiteConcrete
+        );
+        arch.position.set(a * 48, 0, -310);
+        arch.rotation.y = 0.25;
+        scene.add(arch);
+      }
+
+      // Superintendência da Polícia Federal (PF) com Cela de Prisão
+      const pfBuilding = new THREE.Mesh(
+        new THREE.BoxGeometry(28, 16, 22),
+        new THREE.MeshLambertMaterial({ color: 0x18181b })
+      );
+      pfBuilding.position.set(112, 8, 45);
+      scene.add(pfBuilding);
+      createSignBoard('POLÍCIA FEDERAL - DF', '#09090b', '#facc15', 112, 18, 56.5, 0, 22, 4.5);
+
+      // Cela de Prisão 3D ao lado da PF
+      const cellFloor = new THREE.Mesh(
+        new THREE.BoxGeometry(14, 0.4, 14),
+        new THREE.MeshLambertMaterial({ color: 0x3f3f46 })
+      );
+      cellFloor.position.set(112, 0.2, 72);
+      scene.add(cellFloor);
+
+      const barMat = new THREE.MeshLambertMaterial({ color: 0xd4d4d8 });
+      for (let b = -6; b <= 6; b += 2) {
+        const barF = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 8), barMat);
+        barF.position.set(112 + b, 4, 79);
+        const barB = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 8), barMat);
+        barB.position.set(112 + b, 4, 65);
+        const barL = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 8), barMat);
+        barL.position.set(105, 4, 72 + b);
+        const barR = new THREE.Mesh(new THREE.CylinderGeometry(0.18, 0.18, 8), barMat);
+        barR.position.set(119, 4, 72 + b);
+        scene.add(barF, barB, barL, barR);
+      }
+
+      // Hospital & Ambulância do SAMU 192 em Brasília
+      const hospital = new THREE.Mesh(
+        new THREE.BoxGeometry(26, 15, 20),
+        new THREE.MeshLambertMaterial({ color: 0xf8fafc })
+      );
+      hospital.position.set(-112, 7.5, 45);
+      scene.add(hospital);
+      createSignBoard('HOSPITAL SAMU 192', '#dc2626', '#ffffff', -112, 17, 55.5, 0, 20, 4.5);
+
+      // Placas de Saída para Goiás/Goiânia, Minas Gerais e Paraná
+      createSignBoard('BR-060 ► GOIÂNIA / GOIÁS', '#15803d', '#ffffff', -165, 9, 10, Math.PI / 2, 22, 5);
+      createSignBoard('BR-040 ► MINAS GERAIS', '#15803d', '#ffffff', 165, 9, 10, -Math.PI / 2, 22, 5);
+      createSignBoard('BR-153 ▼ PARANÁ / SUL', '#15803d', '#ffffff', 0, 9, 148, 0, 22, 5);
+    }
+
+    // =========================================================================
+    // 5. RODOVIAS & CIDADES VIZINHAS (GOIÂNIA, MINAS GERAIS, PARANÁ, ESTADOS)
+    // =========================================================================
+    const regionsData = [
+      { id: 'home', name: '🏠 Minha Casa na Montanha', desc: 'Refúgio exclusivo no topo da montanha bem longe', x: -820, z: -820, y: 46, color: '#10b981' },
+      { id: 'bsb', name: 'Brasília - DF (Eixo Monumental)', desc: 'Congresso Nacional, Esplanada e PF', x: 0, z: 35, y: 0, color: '#f59e0b' },
+      { id: 'go', name: 'Goiânia - Goiás (BR-060)', desc: 'Capital de Goiás vizinha ao DF', x: -480, z: 10, y: 0, color: '#16a34a' },
+      { id: 'mg', name: 'Minas Gerais (BR-040)', desc: 'Serras, Pampulha e rodovias mineiras', x: 480, z: 10, y: 0, color: '#dc2626' },
+      { id: 'pr', name: 'Paraná - Sul (BR-153)', desc: 'Araucárias, Ponta Grossa & Curitiba', x: 0, z: 520, y: 0, color: '#0284c7' },
+      { id: 'sp', name: 'São Paulo - SP', desc: 'Avenida Paulista & Ponte Estaiada', x: 480, z: 480, y: 0, color: '#71717a' },
+      { id: 'sc_rs', name: 'Santa Catarina & Rio Grande do Sul', desc: 'Litoral catarinense e Serra Gaúcha', x: -480, z: 520, y: 0, color: '#0d9488' },
+      { id: 'ne', name: 'Nordeste (BA, SE, PE, RN)', desc: 'Praias, faróis e dunas nordestinas', x: 480, z: -480, y: 0, color: '#ea580c' },
+      { id: 'cont', name: 'Todos os Continentes', desc: 'Conexão global de estradas', x: -480, z: -480, y: 0, color: '#8b5cf6' }
+    ];
+
+    function buildMountainHome() {
+      const mx = -820;
+      const mz = -820;
+
+      // Estrada longa até a base da montanha
+      createRoad(-650, -650, 18, 420);
+      createSignBoard('ESTRADA PARA CASA NA MONTANHA ▲', '#10b981', '#000000', -650, 9, -460, Math.PI / 4, 24, 5);
+
+      // Base e encostas da Montanha Gigante
+      const mountainBase = new THREE.Mesh(
+        new THREE.ConeGeometry(130, 52, 24),
+        new THREE.MeshLambertMaterial({ color: 0x3f6212 })
+      );
+      mountainBase.position.set(mx, 24, mz);
+      scene.add(mountainBase);
+
+      // Platô plano no topo da montanha (altura Y = 46)
+      const plateau = new THREE.Mesh(
+        new THREE.CylinderGeometry(48, 56, 4, 24),
+        new THREE.MeshLambertMaterial({ color: 0x65a30d })
+      );
+      plateau.position.set(mx, 44, mz);
+      scene.add(plateau);
+
+      // Casa moderna do jogador no topo da montanha (com porta de entrada interativa)
+      const houseGroup = new THREE.Group();
+      const wallMat = new THREE.MeshLambertMaterial({ color: 0xf8fafc });
+      const woodMat = new THREE.MeshLambertMaterial({ color: 0x92400e });
+      const glassMat = new THREE.MeshPhongMaterial({ color: 0x38bdf8, shininess: 90 });
+
+      const mainFloor = new THREE.Mesh(new THREE.BoxGeometry(24, 8, 18), wallMat);
+      mainFloor.position.set(0, 4, -14);
+      const roof = new THREE.Mesh(new THREE.BoxGeometry(27, 1.4, 21), woodMat);
+      roof.position.set(0, 8.7, -14);
+      const windowLeft = new THREE.Mesh(new THREE.BoxGeometry(6, 4.2, 0.4), glassMat);
+      windowLeft.position.set(-6.5, 4.2, -4.9);
+      const windowRight = new THREE.Mesh(new THREE.BoxGeometry(6, 4.2, 0.4), glassMat);
+      windowRight.position.set(6.5, 4.2, -4.9);
+
+      // Porta de Entrada Destacada
+      const doorFrame = new THREE.Mesh(new THREE.BoxGeometry(4.2, 6.2, 0.5), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
+      doorFrame.position.set(0, 3.1, -4.92);
+      const door = new THREE.Mesh(new THREE.BoxGeometry(3.4, 5.6, 0.6), woodMat);
+      door.position.set(0, 2.8, -4.85);
+      const doorKnob = new THREE.Mesh(new THREE.SphereGeometry(0.18), new THREE.MeshBasicMaterial({ color: 0xfacc15 }));
+      doorKnob.position.set(1.2, 2.8, -4.5);
+
+      // Tapete de boas-vindas na porta
+      const welcomeMat = new THREE.Mesh(
+        new THREE.BoxGeometry(4.5, 0.15, 2.5),
+        new THREE.MeshLambertMaterial({ color: 0xdc2626 })
+      );
+      welcomeMat.position.set(0, 0.08, -3.2);
+
+      // Piscina na Montanha
+      const pool = new THREE.Mesh(
+        new THREE.BoxGeometry(12, 0.4, 8),
+        new THREE.MeshPhongMaterial({ color: 0x0ea5e9, shininess: 95 })
+      );
+      pool.position.set(20, 0.2, -8);
+
+      houseGroup.add(mainFloor, roof, windowLeft, windowRight, doorFrame, door, doorKnob, welcomeMat, pool);
+      houseGroup.position.set(mx, 46, mz);
+      scene.add(houseGroup);
+
+      createSignBoard('🏠 CASA DO JOGADOR • PORTA DE ENTRADA', '#10b981', '#ffffff', mx, 54, mz - 24, 0, 26, 5);
+    }
+
+    // =========================================================================
+    // 5B. INTERIOR COMPLETO DA CASA (SALA, COZINHA DO PAI NOVERSAL E MEU QUARTO)
+    // =========================================================================
+    const INTERIOR_ORIGIN = { x: 1400, y: 0, z: -1400 };
+    let fatherNoversalMesh = null;
+    let kitchenFoodMesh = null;
+    let bedroomConsoleScreen = null;
+
+    function buildHouseInterior() {
+      const ox = INTERIOR_ORIGIN.x;
+      const oz = INTERIOR_ORIGIN.z;
+      const interiorGroup = new THREE.Group();
+      interiorGroup.position.set(ox, 0, oz);
+
+      // Piso de madeira aconchegante (36m x 30m)
+      const floor = new THREE.Mesh(
+        new THREE.BoxGeometry(36, 0.4, 30),
+        new THREE.MeshLambertMaterial({ color: 0xb45309 })
+      );
+      floor.position.set(0, 0, 0);
+      interiorGroup.add(floor);
+
+      // Paredes externas do interior
+      const wallMat = new THREE.MeshLambertMaterial({ color: 0xfef3c7 });
+      const wallBack = new THREE.Mesh(new THREE.BoxGeometry(36, 7, 0.8), wallMat);
+      wallBack.position.set(0, 3.5, -15);
+      const wallFront = new THREE.Mesh(new THREE.BoxGeometry(36, 7, 0.8), wallMat);
+      wallFront.position.set(0, 3.5, 15);
+      const wallLeft = new THREE.Mesh(new THREE.BoxGeometry(0.8, 7, 30), wallMat);
+      wallLeft.position.set(-18, 3.5, 0);
+      const wallRight = new THREE.Mesh(new THREE.BoxGeometry(0.8, 7, 30), wallMat);
+      wallRight.position.set(18, 3.5, 0);
+
+      // Parede divisória interna separando Sala/Cozinha do Meu Quarto (com passagem aberta)
+      const dividerLeft = new THREE.Mesh(new THREE.BoxGeometry(14, 7, 0.7), wallMat);
+      dividerLeft.position.set(-11, 3.5, -1);
+      const dividerRight = new THREE.Mesh(new THREE.BoxGeometry(14, 7, 0.7), wallMat);
+      dividerRight.position.set(11, 3.5, -1);
+
+      interiorGroup.add(wallBack, wallFront, wallLeft, wallRight, dividerLeft, dividerRight);
+
+      // Porta de Saída de volta para a Montanha (na frente em z = +14.4)
+      const exitDoor = new THREE.Mesh(
+        new THREE.BoxGeometry(3.6, 5.8, 0.4),
+        new THREE.MeshLambertMaterial({ color: 0x78350f })
+      );
+      exitDoor.position.set(0, 2.9, 14.4);
+      interiorGroup.add(exitDoor);
+      createSignBoard('🚪 PORTA DE SAÍDA (MONTANHA)', '#ef4444', '#ffffff', ox, 6.2, oz + 14.1, Math.PI, 10, 2.2);
+
+      // --- ÁREA DA COZINHA (Lado Esquerdo Frontal: x = -11, z = +7) ---
+      const counter = new THREE.Mesh(
+        new THREE.BoxGeometry(8, 2.2, 2.6),
+        new THREE.MeshLambertMaterial({ color: 0xf8fafc })
+      );
+      counter.position.set(-11, 1.1, 8.5);
+      const stove = new THREE.Mesh(
+        new THREE.BoxGeometry(2.6, 2.3, 2.6),
+        new THREE.MeshLambertMaterial({ color: 0x334155 })
+      );
+      stove.position.set(-16, 1.15, 8.5);
+      // Panela no fogão
+      const pot = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.7, 0.7, 0.6, 16),
+        new THREE.MeshLambertMaterial({ color: 0x94a3b8 })
+      );
+      pot.position.set(-16, 2.6, 8.5);
+
+      // Mesa de Jantar com Prato de Comida feita pelo Pai Noversal
+      const diningTable = new THREE.Mesh(
+        new THREE.BoxGeometry(5.5, 1.8, 3.2),
+        new THREE.MeshLambertMaterial({ color: 0x78350f })
+      );
+      diningTable.position.set(-8, 0.9, 3.5);
+
+      kitchenFoodMesh = new THREE.Group();
+      const plate = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.85, 0.7, 0.15, 18),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+      );
+      const foodPile = new THREE.Mesh(
+        new THREE.SphereGeometry(0.55, 12, 10),
+        new THREE.MeshLambertMaterial({ color: 0xf59e0b })
+      );
+      foodPile.scale.set(1, 0.5, 1);
+      foodPile.position.y = 0.2;
+      kitchenFoodMesh.add(plate, foodPile);
+      kitchenFoodMesh.position.set(-8, 1.9, 3.5);
+
+      interiorGroup.add(counter, stove, pot, diningTable, kitchenFoodMesh);
+      createSignBoard('🍳 COZINHA DO PAI NOVERSAL', '#f59e0b', '#000000', ox - 11, 5.5, oz + 11.5, Math.PI, 10, 2.2);
+
+      // --- SALA DE ESTAR (Lado Direito Frontal: x = +10, z = +7) ---
+      const sofa = new THREE.Mesh(
+        new THREE.BoxGeometry(6.5, 1.8, 2.6),
+        new THREE.MeshLambertMaterial({ color: 0x1d4ed8 })
+      );
+      sofa.position.set(10, 0.9, 9.5);
+      const tvStand = new THREE.Mesh(
+        new THREE.BoxGeometry(5, 1.4, 1.6),
+        new THREE.MeshLambertMaterial({ color: 0x18181b })
+      );
+      tvStand.position.set(10, 0.7, 3.2);
+      const livingTv = new THREE.Mesh(
+        new THREE.BoxGeometry(4.4, 2.5, 0.25),
+        new THREE.MeshBasicMaterial({ color: 0x0ea5e9 })
+      );
+      livingTv.position.set(10, 2.7, 3.2);
+      interiorGroup.add(sofa, tvStand, livingTv);
+
+      // --- MEU QUARTO GAMER (Fundo da Casa: z = -8) ---
+      const bedBase = new THREE.Mesh(
+        new THREE.BoxGeometry(5.2, 1.3, 7.2),
+        new THREE.MeshLambertMaterial({ color: 0x1e293b })
+      );
+      bedBase.position.set(-11, 0.65, -9.5);
+      const mattress = new THREE.Mesh(
+        new THREE.BoxGeometry(4.8, 0.6, 6.8),
+        new THREE.MeshLambertMaterial({ color: 0x10b981 })
+      );
+      mattress.position.set(-11, 1.5, -9.5);
+      const pillow = new THREE.Mesh(
+        new THREE.BoxGeometry(3.4, 0.45, 1.3),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+      );
+      pillow.position.set(-11, 1.9, -12);
+
+      // Mesa Gamer com PC / Videogame para jogar no Quarto!
+      const gamerDesk = new THREE.Mesh(
+        new THREE.BoxGeometry(6.5, 1.8, 2.8),
+        new THREE.MeshLambertMaterial({ color: 0x09090b })
+      );
+      gamerDesk.position.set(9.5, 0.9, -11.5);
+      const gamerChair = new THREE.Mesh(
+        new THREE.BoxGeometry(2.0, 2.4, 2.0),
+        new THREE.MeshLambertMaterial({ color: 0xdc2626 })
+      );
+      gamerChair.position.set(9.5, 1.2, -8.5);
+      bedroomConsoleScreen = new THREE.Mesh(
+        new THREE.BoxGeometry(3.6, 2.1, 0.25),
+        new THREE.MeshBasicMaterial({ color: 0x22c55e })
+      );
+      bedroomConsoleScreen.position.set(9.5, 2.9, -12.2);
+
+      interiorGroup.add(bedBase, mattress, pillow, gamerDesk, gamerChair, bedroomConsoleScreen);
+      createSignBoard('🎮 MEU QUARTO • SETUP GAMER', '#10b981', '#000000', ox + 9.5, 5.6, oz - 14.2, 0, 11, 2.2);
+      createSignBoard('🛏️ MEU QUARTO', '#3b82f6', '#ffffff', ox, 5.8, oz - 1.2, 0, 8, 2.0);
+
+      scene.add(interiorGroup);
+
+      // Personagem Pai "Noversal" na Cozinha
+      fatherNoversalMesh = createCatCharacter({
+        bodyColor: 0x374151,
+        bellyColor: 0xffffff,
+        shirtColor: 0xf59e0b,
+        hasHat: false,
+        hasGlasses: true
+      });
+      fatherNoversalMesh.position.set(ox - 12.5, 0, oz + 6.5);
+      fatherNoversalMesh.rotation.y = Math.PI * 0.35;
+      scene.add(fatherNoversalMesh);
+    }
+
+    // =========================================================================
+    // 6. PERSONAGENS GATOS 3D (PROTAGONISTA FRAJOLA, PEDESTRES E POLÍCIA FEDERAL)
+    // =========================================================================
+    function createCatCharacter({
+      bodyColor = 0x111827,
+      bellyColor = 0xffffff,
+      shirtColor = 0xffffff,
+      hasHat = false,
+      hasGlasses = false,
+      hasGoldChain = false,
+      isPF = false
+    } = {}) {
+      const group = new THREE.Group();
+
+      // Pernas
+      const legMat = new THREE.MeshLambertMaterial({ color: isPF ? 0x09090b : 0x1e293b });
+      const legL = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.05, 0.42), legMat);
+      legL.position.set(-0.28, 0.52, 0);
+      const legR = new THREE.Mesh(new THREE.BoxGeometry(0.42, 1.05, 0.42), legMat);
+      legR.position.set(0.28, 0.52, 0);
+      group.add(legL, legR);
+
+      // Tronco / Camisa
+      const torsoMat = new THREE.MeshLambertMaterial({ color: isPF ? 0x09090b : shirtColor });
+      const torso = new THREE.Mesh(new THREE.BoxGeometry(1.15, 1.35, 0.68), torsoMat);
+      torso.position.y = 1.72;
+      torso.castShadow = true;
+      group.add(torso);
+
+      // Detalhe dourado no uniforme da Polícia Federal ou corrente de ouro
+      if (isPF) {
+        const badge = new THREE.Mesh(
+          new THREE.BoxGeometry(0.32, 0.28, 0.72),
+          new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+        );
+        badge.position.set(0.28, 2.02, 0);
+        group.add(badge);
+      } else if (hasGoldChain) {
+        const chain = new THREE.Mesh(
+          new THREE.TorusGeometry(0.36, 0.06, 8, 16, Math.PI),
+          new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+        );
+        chain.rotation.x = Math.PI;
+        chain.position.set(0, 2.25, 0.35);
+        group.add(chain);
+      }
+
+      // Braços
+      const armMat = new THREE.MeshLambertMaterial({ color: bodyColor });
+      const armL = new THREE.Mesh(new THREE.BoxGeometry(0.36, 1.15, 0.36), armMat);
+      armL.position.set(-0.78, 1.75, 0);
+      const armR = new THREE.Mesh(new THREE.BoxGeometry(0.36, 1.15, 0.36), armMat);
+      armR.position.set(0.78, 1.75, 0);
+      group.add(armL, armR);
+
+      // Cabeça de Gato
+      const headGroup = new THREE.Group();
+      headGroup.position.y = 2.92;
+      const head = new THREE.Mesh(
+        new THREE.BoxGeometry(1.05, 0.95, 0.95),
+        new THREE.MeshLambertMaterial({ color: bodyColor })
+      );
+      headGroup.add(head);
+
+      // Orelhas pontudas
+      const earGeo = new THREE.ConeGeometry(0.22, 0.42, 4);
+      const earMat = new THREE.MeshLambertMaterial({ color: bodyColor });
+      const earL = new THREE.Mesh(earGeo, earMat);
+      earL.position.set(-0.34, 0.64, 0);
+      const earR = new THREE.Mesh(earGeo, earMat);
+      earR.position.set(0.34, 0.64, 0);
+      headGroup.add(earL, earR);
+
+      // Focinho
+      const muzzle = new THREE.Mesh(
+        new THREE.BoxGeometry(0.62, 0.38, 0.25),
+        new THREE.MeshLambertMaterial({ color: bellyColor })
+      );
+      muzzle.position.set(0, -0.16, 0.48);
+      headGroup.add(muzzle);
+
+      // Nariz rosa
+      const nose = new THREE.Mesh(
+        new THREE.BoxGeometry(0.16, 0.12, 0.12),
+        new THREE.MeshBasicMaterial({ color: 0xf472b6 })
+      );
+      nose.position.set(0, -0.06, 0.62);
+      headGroup.add(nose);
+
+      // Olhos ou Óculos Escuros GTA
+      if (hasGlasses) {
+        const glasses = new THREE.Mesh(
+          new THREE.BoxGeometry(0.92, 0.24, 0.14),
+          new THREE.MeshBasicMaterial({ color: 0x09090b })
+        );
+        glasses.position.set(0, 0.12, 0.52);
+        headGroup.add(glasses);
+      } else {
+        const eyeMat = new THREE.MeshBasicMaterial({ color: 0xfef08a });
+        const eyeL = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.1), eyeMat);
+        eyeL.position.set(-0.24, 0.14, 0.48);
+        const eyeR = new THREE.Mesh(new THREE.BoxGeometry(0.18, 0.18, 0.1), eyeMat);
+        eyeR.position.set(0.24, 0.14, 0.48);
+        headGroup.add(eyeL, eyeR);
+      }
+
+      // Boné Branco do Protagonista ou Quepe Preto da Polícia Federal
+      if (hasHat || isPF) {
+        const capColor = isPF ? 0x09090b : 0xffffff;
+        const capTop = new THREE.Mesh(
+          new THREE.BoxGeometry(1.08, 0.28, 1.02),
+          new THREE.MeshLambertMaterial({ color: capColor })
+        );
+        capTop.position.set(0, 0.54, 0);
+        const capVisor = new THREE.Mesh(
+          new THREE.BoxGeometry(0.95, 0.1, 0.52),
+          new THREE.MeshLambertMaterial({ color: capColor })
+        );
+        capVisor.position.set(0, 0.44, 0.56);
+        headGroup.add(capTop, capVisor);
+      }
+
+      group.add(headGroup);
+
+      // Rabo do Gato
+      const tail = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.08, 0.08, 1.25, 8),
+        new THREE.MeshLambertMaterial({ color: bodyColor })
+      );
+      tail.position.set(0, 1.45, -0.58);
+      tail.rotation.x = -0.65;
+      group.add(tail);
+
+      // Estrelinhas de tontura (quando nocauteado/atropelado)
+      const starsGroup = new THREE.Group();
+      starsGroup.position.y = 3.7;
+      starsGroup.visible = false;
+      for (let s = 0; s < 3; s++) {
+        const ang = (s / 3) * Math.PI * 2;
+        const st = new THREE.Mesh(
+          new THREE.OctahedronGeometry(0.16),
+          new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+        );
+        st.position.set(Math.cos(ang) * 0.55, 0, Math.sin(ang) * 0.55);
+        starsGroup.add(st);
+      }
+      group.add(starsGroup);
+
+      group.userData = { legL, legR, armL, armR, tail, starsGroup };
+      return group;
+    }
+
+    // Constrói Brasília, a Casa na Montanha e o Interior da Casa
+    buildBrasilia();
+    buildMountainHome();
+    buildHouseInterior();
+
+    // Protagonista Gato Frajola (boné branco, óculos escuros e corrente de ouro)
+    const player = createCatCharacter({
+      bodyColor: 0x111827,
+      bellyColor: 0xffffff,
+      shirtColor: 0xffffff,
+      hasHat: true,
+      hasGlasses: true,
+      hasGoldChain: true
+    });
+    player.position.set(0, 0, 35);
+    scene.add(player);
+
+    // Pedestres Gatos de várias cores (sem boné)
+    const catColors = [0xf97316, 0x9ca3af, 0xd97706, 0xfef3c7, 0x78350f, 0x4b5563];
+    const shirtColors = [0xef4444, 0x3b82f6, 0x10b981, 0xa855f7, 0xf59e0b, 0xec4899];
+    const pedestrians = [];
+
+    function spawnPedestrians() {
+      pedestrians.forEach(p => scene.remove(p.mesh));
+      pedestrians.length = 0;
+
+      for (let i = 0; i < 26; i++) {
+        const cIdx = i % catColors.length;
+        const mesh = createCatCharacter({
+          bodyColor: catColors[cIdx],
+          bellyColor: 0xffffff,
+          shirtColor: shirtColors[(i + 2) % shirtColors.length],
+          hasHat: false,
+          hasGlasses: false
+        });
+        const px = (Math.random() - 0.5) * 240;
+        const pz = (Math.random() - 0.5) * 240;
+        mesh.position.set(px, 0, pz);
+        scene.add(mesh);
+
+        pedestrians.push({
+          mesh,
+          dir: Math.random() * Math.PI * 2,
+          speed: 3.5 + Math.random() * 2,
+          hp: 100,
+          hostile: false,
+          attackCooldown: 0,
+          knockedOut: false,
+          koTimer: 0
+        });
+      }
+    }
+    spawnPedestrians();
+
+    // =========================================================================
+    // 7. VEÍCULOS 3D, POLÍCIA FEDERAL (VIATURA, CAMINHÃO E AVIÃO) E CHECKPOINTS
+    // =========================================================================
+    const vehicles = [];
+    function createVehicle(x, z, color, label, isPolice = false, isTruck = false) {
+      const group = new THREE.Group();
+      const w = isTruck ? 3.8 : 2.8;
+      const h = isTruck ? 3.4 : 1.5;
+      const l = isTruck ? 8.2 : 5.4;
+
+      const body = new THREE.Mesh(
+        new THREE.BoxGeometry(w, h, l),
+        new THREE.MeshLambertMaterial({ color: isPolice ? 0x09090b : color })
+      );
+      body.position.y = h / 2 + 0.55;
+      body.castShadow = true;
+      group.add(body);
+
+      if (!isTruck) {
+        const cabin = new THREE.Mesh(
+          new THREE.BoxGeometry(w * 0.86, 1.15, l * 0.52),
+          new THREE.MeshLambertMaterial({ color: isPolice ? 0x18181b : 0xe2e8f0 })
+        );
+        cabin.position.set(0, h + 1.0, -0.2);
+        group.add(cabin);
+      }
+
+      if (isPolice) {
+        // Faixa dourada da Polícia Federal
+        const stripe = new THREE.Mesh(
+          new THREE.BoxGeometry(w + 0.08, 0.35, l * 0.92),
+          new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+        );
+        stripe.position.y = 1.45;
+        group.add(stripe);
+
+        // Giroflex Vermelho e Azul
+        const sirenR = new THREE.Mesh(
+          new THREE.BoxGeometry(0.6, 0.3, 0.4),
+          new THREE.MeshBasicMaterial({ color: 0xef4444 })
+        );
+        sirenR.position.set(-0.5, isTruck ? 4.1 : 2.75, 0);
+        const sirenB = new THREE.Mesh(
+          new THREE.BoxGeometry(0.6, 0.3, 0.4),
+          new THREE.MeshBasicMaterial({ color: 0x3b82f6 })
+        );
+        sirenB.position.set(0.5, isTruck ? 4.1 : 2.75, 0);
+        group.add(sirenR, sirenB);
+        group.userData.sirenR = sirenR;
+        group.userData.sirenB = sirenB;
+      }
+
+      // Rodas
+      const wheelGeo = new THREE.CylinderGeometry(0.62, 0.62, 0.45, 14);
+      const wheelMat = new THREE.MeshLambertMaterial({ color: 0x111827 });
+      const wheelOffsets = [
+        [-w / 2, 0.62, l * 0.32],
+        [w / 2, 0.62, l * 0.32],
+        [-w / 2, 0.62, -l * 0.32],
+        [w / 2, 0.62, -l * 0.32]
+      ];
+      wheelOffsets.forEach(([wx, wy, wz]) => {
+        const wh = new THREE.Mesh(wheelGeo, wheelMat);
+        wh.rotation.z = Math.PI / 2;
+        wh.position.set(wx, wy, wz);
+        group.add(wh);
+      });
+
+      group.position.set(x, 0, z);
+      scene.add(group);
+      vehicles.push({ mesh: group, label, isPolice, isTruck, speed: 0 });
+    }
+
+    // Carros em Brasília
+    createVehicle(-28, 32, 0xef4444, 'Esportivo Vermelho');
+    createVehicle(28, 12, 0xfacc15, 'Táxi Brasília');
+    createVehicle(-28, -25, 0x3b82f6, 'Cupê Azul');
+    createVehicle(92, 42, 0x09090b, 'Viatura Polícia Federal', true, false);
+    createVehicle(92, 58, 0x09090b, 'Caminhão Blindado PF', true, true);
+    createVehicle(-92, 52, 0xffffff, 'Ambulância SAMU 192', false, true);
+
+    // Ambulância de Resgate Automático do SAMU 192 + Socorrista Gato
+    const samuAmbulance = new THREE.Group();
+    const ambBody = new THREE.Mesh(
+      new THREE.BoxGeometry(3.8, 3.3, 8.0),
+      new THREE.MeshLambertMaterial({ color: 0xffffff })
+    );
+    ambBody.position.y = 2.2;
+    ambBody.castShadow = true;
+    const ambStripeRed = new THREE.Mesh(
+      new THREE.BoxGeometry(3.9, 0.45, 7.6),
+      new THREE.MeshBasicMaterial({ color: 0xdc2626 })
+    );
+    ambStripeRed.position.y = 1.9;
+    const ambStripeOrange = new THREE.Mesh(
+      new THREE.BoxGeometry(3.9, 0.25, 7.6),
+      new THREE.MeshBasicMaterial({ color: 0xf97316 })
+    );
+    ambStripeOrange.position.y = 2.35;
+    const ambSiren = new THREE.Mesh(
+      new THREE.BoxGeometry(1.4, 0.35, 0.5),
+      new THREE.MeshBasicMaterial({ color: 0xef4444 })
+    );
+    ambSiren.position.set(0, 4.05, 1.8);
+    samuAmbulance.add(ambBody, ambStripeRed, ambStripeOrange, ambSiren);
+
+    const ambWheelGeo = new THREE.CylinderGeometry(0.62, 0.62, 0.45, 14);
+    const ambWheelMat = new THREE.MeshLambertMaterial({ color: 0x111827 });
+    [[-1.9, 0.62, 2.5], [1.9, 0.62, 2.5], [-1.9, 0.62, -2.5], [1.9, 0.62, -2.5]].forEach(([wx, wy, wz]) => {
+      const wh = new THREE.Mesh(ambWheelGeo, ambWheelMat);
+      wh.rotation.z = Math.PI / 2;
+      wh.position.set(wx, wy, wz);
+      samuAmbulance.add(wh);
+    });
+    samuAmbulance.position.set(-108, 0, 62);
+    scene.add(samuAmbulance);
+
+    const samuMedic = createCatCharacter({
+      bodyColor: 0xf8fafc,
+      bellyColor: 0xffffff,
+      shirtColor: 0xdc2626,
+      hasHat: false,
+      hasGlasses: false
+    });
+    samuMedic.visible = false;
+    samuMedic.position.set(-108, 0, 62);
+    scene.add(samuMedic);
+
+    const samuRescue = {
+      active: false,
+      stage: 'idle', // 'driving_to_victim' | 'medic_walking' | 'driving_to_hospital'
+      targetPed: null
+    };
+
+    function dispatchSamuForPedestrian(ped) {
+      if (samuRescue.active) return;
+      samuRescue.active = true;
+      samuRescue.stage = 'driving_to_victim';
+      samuRescue.targetPed = ped;
+      samuAmbulance.position.set(-108, 0, 62);
+      samuMedic.visible = false;
+      showToast('🚑 SAMU 192 acionado! A ambulância está indo socorrer o gato atropelado!');
+    }
+
+    // Avião da Polícia Federal no céu
+    const pfPlane = new THREE.Group();
+    const fuselage = new THREE.Mesh(
+      new THREE.CylinderGeometry(1.4, 1.1, 14, 12),
+      new THREE.MeshLambertMaterial({ color: 0x09090b })
+    );
+    fuselage.rotation.x = Math.PI / 2;
+    const wings = new THREE.Mesh(
+      new THREE.BoxGeometry(18, 0.35, 3.2),
+      new THREE.MeshLambertMaterial({ color: 0xfacc15 })
+    );
+    const tailFin = new THREE.Mesh(
+      new THREE.BoxGeometry(0.4, 3.2, 2.5),
+      new THREE.MeshLambertMaterial({ color: 0x09090b })
+    );
+    tailFin.position.set(0, 1.5, -5.5);
+    const planeBeaconR = new THREE.Mesh(new THREE.SphereGeometry(0.55), new THREE.MeshBasicMaterial({ color: 0xef4444 }));
+    planeBeaconR.position.set(-8.8, 0.3, 0);
+    const planeBeaconB = new THREE.Mesh(new THREE.SphereGeometry(0.55), new THREE.MeshBasicMaterial({ color: 0x3b82f6 }));
+    planeBeaconB.position.set(8.8, 0.3, 0);
+    pfPlane.add(fuselage, wings, tailFin, planeBeaconR, planeBeaconB);
+    pfPlane.position.set(0, 58, -60);
+    scene.add(pfPlane);
+
+    // Agentes da Polícia Federal que perseguem o jogador
+    const pfOfficers = [];
+    for (let i = 0; i < 4; i++) {
+      const off = createCatCharacter({
+        bodyColor: 0x1f2937,
+        bellyColor: 0xffffff,
+        isPF: true
+      });
+      off.position.set(105 + i * 3, 0, 45);
+      scene.add(off);
+      pfOfficers.push(off);
+    }
+
+    // Checkpoints Dourados no Eixo Monumental
+    const checkpoints = [];
+    const cpCoords = [
+      [0, -15], [0, -70], [-38, -40], [38, -40], [0, 85], [-120, 10], [120, 10]
+    ];
+    cpCoords.forEach(([cx, cz]) => {
+      const ring = new THREE.Mesh(
+        new THREE.TorusGeometry(3.2, 0.35, 10, 24),
+        new THREE.MeshBasicMaterial({ color: 0xfacc15 })
+      );
+      ring.rotation.x = Math.PI / 2;
+      ring.position.set(cx, 1.2, cz);
+      scene.add(ring);
+      checkpoints.push(ring);
+    });
+
+    // =========================================================================
+    // 8. ESTADO DO JOGO, HUD, CASA NA MONTANHA, PRISÃO PF & SAMU 192
+    // =========================================================================
+    const state = {
+      loaded: false,
+      money: 2500,
+      checkpointsCount: 0,
+      health: 100,
+      wanted: 0,
+      inVehicle: null,
+      isArrested: false,
+      hasPFWarning: false,
+      inWarningDialog: false,
+      prisonDaysLeft: 0,
+      prisonDayTimer: 0,
+      isDowned: false,
+      fallRecoveryTimer: 0,
+      insideHouse: false,
+      foodReady: true,
+      hasEatenFood: false,
+      houseActionType: null,
+      sprintToggle: false,
+      cameraMode: 0,
+      velY: 0,
+      onGround: true,
+      punchTimer: 0,
+      planeAngle: 0,
+      keys: { up: false, down: false, left: false, right: false, shift: false }
+    };
+
+    let toastTimeout = null;
+    function showToast(msg) {
+      const banner = document.getElementById('toastBanner');
+      const text = document.getElementById('toastText');
+      text.textContent = msg;
+      banner.classList.remove('hidden');
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => banner.classList.add('hidden'), 3200);
+    }
+
+    function updateHUD() {
+      document.getElementById('moneyDisplay').textContent = `R$ ${state.money.toLocaleString('pt-BR')}`;
+      document.getElementById('missionDisplay').textContent = `Checkpoints: ${state.checkpointsCount}`;
+      document.getElementById('healthText').textContent = `${Math.max(0, Math.round(state.health))}%`;
+      document.getElementById('healthBar').style.width = `${Math.max(0, state.health)}%`;
+
+      const starsEl = document.getElementById('wantedStars');
+      let stars = '';
+      for (let i = 1; i <= 5; i++) {
+        stars += i <= state.wanted ? '★' : '☆';
+      }
+      starsEl.textContent = stars;
+      starsEl.className = state.wanted > 0
+        ? 'text-sm sm:text-base tracking-widest text-amber-400 drop-shadow'
+        : 'text-sm sm:text-base tracking-widest text-zinc-500';
+    }
+
+    function damagePlayer(amount, reasonText) {
+      if (state.isDowned || state.isArrested) return;
+      state.health = Math.max(0, state.health - amount);
+      updateHUD();
+      if (state.health <= 0) {
+        state.isDowned = true;
+        if (state.inVehicle) {
+          state.inVehicle.speed = 0;
+          player.visible = true;
+          state.inVehicle = null;
+        }
+        document.getElementById('samuMessage').textContent =
+          `🚑 Socorrista do SAMU: "${reasonText} Fizemos os primeiros socorros no Hospital de Brasília. Você já pode voltar!"`;
+        document.getElementById('samuModal').classList.remove('hidden');
+      }
+    }
+
+    function getGroundHeight(x, z) {
+      if (state.insideHouse) return 0;
+      const distMountain = Math.hypot(x - (-820), z - (-820));
+      if (distMountain <= 52) return 46;
+      return 0;
+    }
+
+    function enterMyHouse() {
+      if (state.isArrested || state.isDowned) return;
+      if (state.inVehicle) {
+        state.inVehicle.speed = 0;
+        player.visible = true;
+        state.inVehicle = null;
+      }
+      state.insideHouse = true;
+      state.foodReady = true;
+      if (kitchenFoodMesh) kitchenFoodMesh.visible = true;
+      player.position.set(INTERIOR_ORIGIN.x, 0, INTERIOR_ORIGIN.z + 11.5);
+      player.rotation.y = Math.PI;
+      document.getElementById('locationBadge').textContent = '🏠 Dentro da Minha Casa • v1.0';
+      document.getElementById('houseMapCard').classList.remove('hidden');
+      showToast('🏠 Você entrou na sua casa! Seu pai Noversal está fazendo comida na cozinha!');
+    }
+
+    function exitMyHouse() {
+      state.insideHouse = false;
+      player.position.set(-820, 46, -821.5);
+      player.rotation.y = 0;
+      document.getElementById('locationBadge').textContent = '🏠 Casa na Montanha • v1.0';
+      document.getElementById('houseMapCard').classList.add('hidden');
+      document.getElementById('houseActionBox').classList.add('hidden');
+      showToast('⛰️ Você saiu pela porta da sua Casa na Montanha!');
+    }
+
+    function drawHouseMiniMap() {
+      const canvas = document.getElementById('houseMapCanvas');
+      if (!canvas) return;
+      const ctx = canvas.getContext('2d');
+      const w = canvas.width;
+      const h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+
+      // Fundo da planta da casa
+      ctx.fillStyle = '#18181b';
+      ctx.fillRect(0, 0, w, h);
+
+      // Paredes externas
+      ctx.strokeStyle = '#fbbf24';
+      ctx.lineWidth = 2;
+      ctx.strokeRect(8, 8, w - 16, h - 16);
+
+      // Divisória do Quarto (parte de cima) e Sala/Cozinha (parte de baixo)
+      ctx.beginPath();
+      ctx.moveTo(8, h * 0.48);
+      ctx.lineTo(w * 0.4, h * 0.48);
+      ctx.moveTo(w * 0.6, h * 0.48);
+      ctx.lineTo(w - 8, h * 0.48);
+      ctx.stroke();
+
+      // Rótulos dos cômodos no mapa
+      ctx.fillStyle = '#34d399';
+      ctx.font = 'bold 9px Inter, sans-serif';
+      ctx.fillText('MEU QUARTO', 14, 22);
+      ctx.fillStyle = '#60a5fa';
+      ctx.fillText('🎮 PC', 112, 22);
+
+      ctx.fillStyle = '#fbbf24';
+      ctx.fillText('COZINHA', 14, h - 14);
+      ctx.fillStyle = '#93c5fd';
+      ctx.fillText('SALA', 114, h - 14);
+
+      // Ponto do Pai Noversal (Laranja)
+      ctx.fillStyle = '#f97316';
+      ctx.beginPath();
+      ctx.arc(34, h * 0.72, 4, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Ponto do Jogador no Mapa da Casa (Verde Brilhante)
+      const relX = (player.position.x - INTERIOR_ORIGIN.x + 18) / 36;
+      const relZ = (player.position.z - INTERIOR_ORIGIN.z + 15) / 30;
+      const px = Math.max(12, Math.min(w - 12, 8 + relX * (w - 16)));
+      const pz = Math.max(12, Math.min(h - 12, 8 + relZ * (h - 16)));
+
+      ctx.fillStyle = '#10b981';
+      ctx.beginPath();
+      ctx.arc(px, pz, 5, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.strokeStyle = '#ffffff';
+      ctx.lineWidth = 1.5;
+      ctx.stroke();
+
+      const roomLabel = document.getElementById('houseRoomLabel');
+      if (player.position.z < INTERIOR_ORIGIN.z - 1) {
+        roomLabel.textContent = '🛏️ Meu Quarto (Vá até o PC Gamer!)';
+      } else if (player.position.x < INTERIOR_ORIGIN.x) {
+        roomLabel.textContent = '🍳 Cozinha • Pai Noversal';
+      } else {
+        roomLabel.textContent = '🛋️ Sala de Estar';
+      }
+    }
+
+    document.getElementById('btnExitHouseTop').addEventListener('click', exitMyHouse);
+
+    document.getElementById('btnHouseAction').addEventListener('click', () => {
+      const act = state.houseActionType;
+      if (act === 'enter_house') {
+        enterMyHouse();
+      } else if (act === 'exit_house') {
+        exitMyHouse();
+      } else if (act === 'talk_noversal') {
+        state.foodReady = true;
+        if (kitchenFoodMesh) kitchenFoodMesh.visible = true;
+        sound.coin();
+        showToast('👨‍🍳 Pai Noversal: "Oi filho! Acabei de preparar uma comida quentinha na mesa pra você!"');
+      } else if (act === 'eat_food') {
+        if (!state.foodReady) {
+          showToast('🍽️ Você já comeu! Fale com o Pai Noversal se quiser mais.');
+          return;
+        }
+        state.foodReady = false;
+        state.hasEatenFood = true;
+        if (kitchenFoodMesh) kitchenFoodMesh.visible = false;
+        state.health = 100;
+        sound.coin();
+        updateHUD();
+        showToast('🍛 Você pegou e comeu a comida do Pai Noversal! Vida 100%! Agora ache seu quarto para jogar!');
+      } else if (act === 'play_game') {
+        state.money += 300;
+        sound.coin();
+        updateHUD();
+        bedroomConsoleScreen.material.color.setHex(Math.random() > 0.5 ? 0xfacc15 : 0x38bdf8);
+        showToast('🎮 Você achou seu quarto e jogou videogame no PC Gamer! (+R$ 300 de bônus!)');
+      }
+    });
+
+    function goToMountainHome() {
+      if (state.isArrested) {
+        showToast('Saia da prisão primeiro dando um Golpe de Estado!');
+        return;
+      }
+      if (state.insideHouse) {
+        exitMyHouse();
+        return;
+      }
+      if (state.inVehicle) {
+        state.inVehicle.mesh.position.set(-820, 46, -812);
+      } else {
+        player.position.set(-820, 46, -818);
+        player.rotation.y = Math.PI;
+      }
+      document.getElementById('locationBadge').textContent = '🏠 Casa na Montanha • v1.0';
+      showToast('🏠 Você chegou na porta da sua Casa na Montanha! Clique em ENTRAR NA MINHA CASA!');
+    }
+
+    document.getElementById('btnGoHome').addEventListener('click', goToMountainHome);
+
+    document.getElementById('btnCornSoup').addEventListener('click', () => {
+      if (state.isArrested || state.isDowned) return;
+      if (state.health >= 100) {
+        showToast('🌽 Sua vida já está cheia (100%)!');
+        return;
+      }
+      if (state.money < 50) {
+        showToast('🌽 Você precisa de R$ 50 para comprar um Caldo de Milho!');
+        return;
+      }
+      state.money -= 50;
+      state.health = Math.min(100, state.health + 40);
+      sound.coin();
+      updateHUD();
+      showToast('🌽 Delícia! Você tomou um Caldo de Milho quentinho (+40% de Vida)!');
+    });
+
+    function arrestPlayer() {
+      if (state.isArrested || state.isDowned || state.inWarningDialog) return;
+
+      // Para o carro se o jogador estiver dirigindo quando o policial encostar
+      if (state.inVehicle) {
+        state.inVehicle.speed = 0;
+        player.position.set(state.inVehicle.mesh.position.x - 3.2, 0, state.inVehicle.mesh.position.z);
+        player.visible = true;
+        state.inVehicle = null;
+      }
+
+      state.wanted = 0;
+      updateHUD();
+
+      // 1ª vez: Policial conversa e dá advertência antes de prender
+      if (!state.hasPFWarning) {
+        state.hasPFWarning = true;
+        state.inWarningDialog = true;
+        document.getElementById('pfWarningModal').classList.remove('hidden');
+        return;
+      }
+
+      // 2ª vez em diante: Vai direto para a prisão por 10 ou 50 dias
+      state.isArrested = true;
+      state.prisonDaysLeft = Math.random() < 0.5 ? 10 : 50;
+      state.prisonDayTimer = 0;
+
+      // Teleporta para dentro da Cela da Polícia Federal
+      player.position.set(112, 0, 72);
+      document.getElementById('prisonDaysBadge').textContent = `Pena: ${state.prisonDaysLeft} Dias Restantes`;
+      document.getElementById('prisonEscapeBox').classList.remove('hidden');
+      showToast(`🚔 Você fez cagada de novo! Preso por ${state.prisonDaysLeft} dias na Polícia Federal!`);
+    }
+
+    // Resposta do jogador na 1ª abordagem da Polícia Federal
+    document.getElementById('btnAcceptWarning').addEventListener('click', () => {
+      state.inWarningDialog = false;
+      state.wanted = 0;
+      // Afasta os agentes da PF um pouco para o jogador seguir seu caminho
+      pfOfficers.forEach((off, i) => {
+        off.position.set(105 + i * 3, 0, 45);
+      });
+      document.getElementById('pfWarningModal').classList.add('hidden');
+      updateHUD();
+      showToast('👮 Policial Federal liberou você! Cuidado para não fazer mais cagada!');
+    });
+
+    // Fuga da Prisão por Golpe de Estado
+    document.getElementById('btnCoupEscape').addEventListener('click', () => {
+      if (!state.isArrested) return;
+      state.isArrested = false;
+      state.prisonDaysLeft = 0;
+      state.wanted = 3;
+      player.position.set(96, 0, 72);
+      document.getElementById('prisonEscapeBox').classList.add('hidden');
+      sound.siren();
+      updateHUD();
+      showToast('💥 GOLPE DE ESTADO! Você arrombou a cela da Polícia Federal e fugiu!');
+    });
+
+    // Alta do Hospital do SAMU 192
+    document.getElementById('btnSamuRevive').addEventListener('click', () => {
+      state.isDowned = false;
+      state.health = 100;
+      state.wanted = 0;
+      player.position.set(-96, 0, 48);
+      document.getElementById('samuModal').classList.add('hidden');
+      updateHUD();
+      showToast('🏥 Alta médica do SAMU 192! De volta às ruas de Brasília.');
+    });
+
+    // Ação de Dar Murro (F)
+    function doPunch() {
+      if (state.isArrested) {
+        document.getElementById('btnCoupEscape').click();
+        return;
+      }
+      if (state.inVehicle || state.isDowned || state.fallRecoveryTimer > 0) return;
+
+      state.punchTimer = 0.28;
+      sound.punch();
+
+      let hitSomeone = false;
+      pedestrians.forEach(ped => {
+        if (!ped.knockedOut && ped.mesh.position.distanceTo(player.position) < 3.4) {
+          ped.knockedOut = true;
+          ped.koTimer = 8;
+          ped.mesh.rotation.x = -Math.PI / 2;
+          ped.mesh.position.y = 0.45;
+          ped.mesh.userData.starsGroup.visible = true;
+          hitSomeone = true;
+        }
+      });
+
+      if (hitSomeone) {
+        state.wanted = Math.min(5, Math.max(2, state.wanted + 1));
+        updateHUD();
+        sound.siren();
+        showToast('🐾 POW! O gato desmaiou! A Polícia Federal está atrás de você!');
+      }
+    }
+
+    // Entrar ou Sair de Veículo (E)
+    function toggleVehicle() {
+      if (state.isArrested || state.isDowned || state.fallRecoveryTimer > 0) return;
+      if (state.inVehicle) {
+        player.position.set(state.inVehicle.mesh.position.x - 3.2, 0, state.inVehicle.mesh.position.z);
+        player.visible = true;
+        showToast(`Saiu de: ${state.inVehicle.label}`);
+        state.inVehicle = null;
+        return;
+      }
+
+      let nearest = null;
+      let minDist = 6.5;
+      vehicles.forEach(v => {
+        const d = v.mesh.position.distanceTo(player.position);
+        if (d < minDist) {
+          minDist = d;
+          nearest = v;
+        }
+      });
+
+      if (nearest) {
+        state.inVehicle = nearest;
+        player.visible = false;
+        showToast(`🚗 Dirigindo: ${nearest.label}`);
+        if (nearest.isPolice) {
+          state.wanted = Math.min(5, Math.max(2, state.wanted + 1));
+          updateHUD();
+          sound.siren();
+        }
+      } else {
+        showToast('Chegue perto de um carro, viatura da PF ou ambulância!');
+      }
+    }
+
+    function doJump() {
+      if (state.inVehicle || state.isArrested || state.isDowned || state.fallRecoveryTimer > 0) return;
+      if (state.onGround) {
+        state.velY = 11.5;
+        state.onGround = false;
+      }
+    }
+
+    // Bindings de Botões Touch/Mouse
+    function bindHoldButton(btnId, keyName) {
+      const el = document.getElementById(btnId);
+      const press = (e) => {
+        e.preventDefault();
+        state.keys[keyName] = true;
+        el.classList.add('pressed');
+      };
+      const release = (e) => {
+        e.preventDefault();
+        state.keys[keyName] = false;
+        el.classList.remove('pressed');
+      };
+      el.addEventListener('pointerdown', press);
+      el.addEventListener('pointerup', release);
+      el.addEventListener('pointerleave', release);
+      el.addEventListener('pointercancel', release);
+    }
+
+    bindHoldButton('btnUp', 'up');
+    bindHoldButton('btnDown', 'down');
+    bindHoldButton('btnLeft', 'left');
+    bindHoldButton('btnRight', 'right');
+
+    document.getElementById('btnJump').addEventListener('pointerdown', (e) => { e.preventDefault(); doJump(); });
+    document.getElementById('btnCar').addEventListener('pointerdown', (e) => { e.preventDefault(); toggleVehicle(); });
+    document.getElementById('btnPunch').addEventListener('pointerdown', (e) => { e.preventDefault(); doPunch(); });
+
+    const btnSprintTop = document.getElementById('btnSprintTop');
+    btnSprintTop.addEventListener('click', () => {
+      state.sprintToggle = !state.sprintToggle;
+      btnSprintTop.textContent = state.sprintToggle ? '⚡ CORRER / NITRO: ON' : '⚡ CORRER / NITRO: OFF';
+      btnSprintTop.classList.toggle('bg-emerald-400', state.sprintToggle);
+      btnSprintTop.classList.toggle('bg-amber-500', !state.sprintToggle);
+    });
+
+    document.getElementById('btnCameraView').addEventListener('click', () => {
+      state.cameraMode = (state.cameraMode + 1) % 2;
+      showToast(state.cameraMode === 0 ? '🎥 Câmera: Terceira Pessoa' : '🎥 Câmera: Panorâmica Esplanada');
+    });
+
+    // Modal GPS Estados & Cidades
+    const mapModal = document.getElementById('mapModal');
+    const regionsGrid = document.getElementById('regionsGrid');
+    regionsData.forEach(reg => {
+      const card = document.createElement('button');
+      card.className = 'text-left bg-zinc-800 hover:bg-zinc-700 border border-white/15 rounded-2xl p-3.5 transition cursor-pointer';
+      card.innerHTML = `
+        <div class="font-black text-amber-400 text-sm">${reg.name}</div>
+        <div class="text-xs text-zinc-300 mt-0.5">${reg.desc}</div>
+      `;
+      card.addEventListener('click', () => {
+        if (state.isArrested) {
+          showToast('Saia da prisão primeiro dando um Golpe de Estado!');
+          return;
+        }
+        if (state.insideHouse) {
+          state.insideHouse = false;
+          document.getElementById('houseMapCard').classList.add('hidden');
+          document.getElementById('houseActionBox').classList.add('hidden');
+        }
+        const targetY = reg.y || 0;
+        if (state.inVehicle) {
+          state.inVehicle.mesh.position.set(reg.x, targetY, reg.z);
+        } else {
+          player.position.set(reg.x, targetY, reg.z);
+        }
+        document.getElementById('locationBadge').textContent = `${reg.name.split('(')[0].trim()} • v1.0`;
+        mapModal.classList.add('hidden');
+        showToast(`📍 Você chegou em: ${reg.name}`);
+      });
+      regionsGrid.appendChild(card);
+    });
+
+    document.getElementById('btnOpenMap').addEventListener('click', () => mapModal.classList.remove('hidden'));
+    document.getElementById('btnCloseMap').addEventListener('click', () => mapModal.classList.add('hidden'));
+
+    // Controles de Teclado
+    window.addEventListener('keydown', (e) => {
+      const k = e.key.toLowerCase();
+      if (k === 'w' || e.key === 'ArrowUp') state.keys.up = true;
+      if (k === 's' || e.key === 'ArrowDown') state.keys.down = true;
+      if (k === 'a' || e.key === 'ArrowLeft') state.keys.left = true;
+      if (k === 'd' || e.key === 'ArrowRight') state.keys.right = true;
+      if (e.key === 'Shift') state.keys.shift = true;
+      if (e.code === 'Space') doJump();
+      if (k === 'f') doPunch();
+      if (k === 'e') toggleVehicle();
+      if (k === 'm') mapModal.classList.toggle('hidden');
+      if (k === 'c') document.getElementById('btnCameraView').click();
+    });
+
+    window.addEventListener('keyup', (e) => {
+      const k = e.key.toLowerCase();
+      if (k === 'w' || e.key === 'ArrowUp') state.keys.up = false;
+      if (k === 's' || e.key === 'ArrowDown') state.keys.down = false;
+      if (k === 'a' || e.key === 'ArrowLeft') state.keys.left = false;
+      if (k === 'd' || e.key === 'ArrowRight') state.keys.right = false;
+      if (e.key === 'Shift') state.keys.shift = false;
+    });
+
+    // =========================================================================
+    // 9. LOOP PRINCIPAL DE ANIMAÇÃO 3D
+    // =========================================================================
+    const clock = new THREE.Clock();
+
+    function animate() {
+      requestAnimationFrame(animate);
+      const dt = Math.min(clock.getDelta(), 0.05);
+      const elapsed = clock.getElapsedTime();
+
+      if (!state.loaded) {
+        renderer.render(scene, camera);
+        return;
+      }
+
+      const isSprinting = state.sprintToggle || state.keys.shift;
+
+      // Contagem dos dias na prisão caso o jogador cumpra a pena na cela
+      if (state.isArrested && state.prisonDaysLeft > 0) {
+        state.prisonDayTimer += dt;
+        if (state.prisonDayTimer >= 1.5) {
+          state.prisonDayTimer = 0;
+          state.prisonDaysLeft -= 1;
+          document.getElementById('prisonDaysBadge').textContent = `Pena: ${state.prisonDaysLeft} Dias Restantes`;
+          if (state.prisonDaysLeft <= 0) {
+            state.isArrested = false;
+            player.position.set(96, 0, 72);
+            document.getElementById('prisonEscapeBox').classList.add('hidden');
+            showToast('🔓 Você cumpriu sua pena na Polícia Federal e foi solto!');
+          }
+        }
+      }
+
+      // Movimento do Jogador (A pé ou no Veículo)
+      if (!state.isArrested && !state.isDowned && !state.inWarningDialog) {
+        if (state.fallRecoveryTimer > 0) {
+          // Jogador caído no chão após queda de altura se recuperando
+          state.fallRecoveryTimer -= dt;
+          player.rotation.x = -Math.PI / 2;
+          player.position.y = getGroundHeight(player.position.x, player.position.z) + 0.45;
+          if (state.fallRecoveryTimer <= 0) {
+            state.fallRecoveryTimer = 0;
+            player.rotation.x = 0;
+            player.position.y = getGroundHeight(player.position.x, player.position.z);
+            showToast('🐱 Você se levantou depois da queda!');
+          }
+        } else if (state.inVehicle) {
+          const v = state.inVehicle;
+          const maxSpd = isSprinting ? 52 : 32;
+          if (state.keys.up) v.speed = Math.min(maxSpd, v.speed + 28 * dt);
+          else if (state.keys.down) v.speed = Math.max(-18, v.speed - 28 * dt);
+          else v.speed *= 0.94;
+
+          if (Math.abs(v.speed) > 0.5) {
+            const turnSign = v.speed >= 0 ? 1 : -1;
+            if (state.keys.left) v.mesh.rotation.y += 2.2 * dt * turnSign;
+            if (state.keys.right) v.mesh.rotation.y -= 2.2 * dt * turnSign;
+          }
+
+          v.mesh.position.x += Math.sin(v.mesh.rotation.y) * v.speed * dt;
+          v.mesh.position.z += Math.cos(v.mesh.rotation.y) * v.speed * dt;
+          const prevVehY = v.mesh.position.y;
+          const nextVehY = getGroundHeight(v.mesh.position.x, v.mesh.position.z);
+          if (prevVehY - nextVehY > 15) {
+            damagePlayer(25, 'Você caiu de uma altura grande com o carro!');
+            showToast('💥 Queda de altura! (-25% de Vida)');
+          }
+          v.mesh.position.y = nextVehY;
+          player.position.copy(v.mesh.position);
+          // Atropelar pedestre com carro aumenta procurado e chama o SAMU 192
+          pedestrians.forEach(ped => {
+            if (!ped.knockedOut && ped.mesh.position.distanceTo(v.mesh.position) < 3.4 && Math.abs(v.speed) > 8) {
+              ped.knockedOut = true;
+              ped.hostile = false;
+              ped.koTimer = 35;
+              ped.mesh.rotation.x = -Math.PI / 2;
+              ped.mesh.position.y = 0.45;
+              ped.mesh.userData.starsGroup.visible = true;
+              state.wanted = Math.min(5, Math.max(2, state.wanted + 1));
+              updateHUD();
+              sound.siren();
+              showToast('🚨 Gato atropelado! Polícia Federal acionada e SAMU 192 a caminho!');
+              dispatchSamuForPedestrian(ped);
+            }
+          });
+        } else {
+          // A pé
+          const moveSpeed = isSprinting ? 18 : 10.5;
+          if (state.keys.left) player.rotation.y += 2.7 * dt;
+          if (state.keys.right) player.rotation.y -= 2.7 * dt;
+
+          let moving = false;
+          if (state.keys.up) {
+            player.position.x += Math.sin(player.rotation.y) * moveSpeed * dt;
+            player.position.z += Math.cos(player.rotation.y) * moveSpeed * dt;
+            moving = true;
+          }
+          if (state.keys.down) {
+            player.position.x -= Math.sin(player.rotation.y) * (moveSpeed * 0.7) * dt;
+            player.position.z -= Math.cos(player.rotation.y) * (moveSpeed * 0.7) * dt;
+            moving = true;
+          }
+
+          // Mantém o jogador dentro das paredes quando estiver dentro da casa
+          if (state.insideHouse) {
+            player.position.x = Math.max(INTERIOR_ORIGIN.x - 16.5, Math.min(INTERIOR_ORIGIN.x + 16.5, player.position.x));
+            player.position.z = Math.max(INTERIOR_ORIGIN.z - 13.5, Math.min(INTERIOR_ORIGIN.z + 13.5, player.position.z));
+          }
+
+          // Pulo e Gravidade com suporte à altura da Montanha e queda com dano
+          const floorY = getGroundHeight(player.position.x, player.position.z);
+          if (!state.onGround || player.position.y > floorY) {
+            state.velY -= 26 * dt;
+            player.position.y += state.velY * dt;
+            if (player.position.y <= floorY) {
+              const impactSpeed = Math.abs(state.velY);
+              player.position.y = floorY;
+              state.velY = 0;
+              state.onGround = true;
+
+              if (impactSpeed > 18) {
+                const fallDmg = Math.min(45, Math.round((impactSpeed - 15) * 1.4));
+                sound.punch();
+                damagePlayer(fallDmg, 'Você caiu de uma altura grande!');
+                if (!state.isDowned) {
+                  state.fallRecoveryTimer = 2.4;
+                  player.rotation.x = -Math.PI / 2;
+                  player.position.y = floorY + 0.45;
+                  showToast(`🤕 Você caiu de uma altura! (-${fallDmg}% de Vida) Levantando...`);
+                }
+              }
+            }
+          } else {
+            player.position.y = floorY;
+          }
+
+          // Animação dos braços, pernas e rabo do Gato Frajola
+          const swing = moving ? Math.sin(elapsed * (isSprinting ? 16 : 10)) * 0.65 : 0;
+          player.userData.legL.rotation.x = swing;
+          player.userData.legR.rotation.x = -swing;
+          player.userData.tail.rotation.z = Math.sin(elapsed * 6) * 0.25;
+
+          if (state.punchTimer > 0) {
+            state.punchTimer -= dt;
+            player.userData.armR.rotation.x = -Math.PI / 2;
+          } else {
+            player.userData.armL.rotation.x = -swing;
+            player.userData.armR.rotation.x = swing;
+          }
+        }
+      }
+
+      // Atualização dos Pedestres Gatos (andar, desmaiar e revidar murros)
+      pedestrians.forEach(ped => {
+        if (ped.knockedOut) {
+          ped.mesh.userData.starsGroup.rotation.y += 4 * dt;
+          if (samuRescue.targetPed !== ped) {
+            ped.koTimer -= dt;
+            if (ped.koTimer <= 0) {
+              ped.knockedOut = false;
+              ped.hostile = false;
+              ped.hp = 100;
+              ped.mesh.rotation.x = 0;
+              ped.mesh.position.y = getGroundHeight(ped.mesh.position.x, ped.mesh.position.z);
+              ped.mesh.userData.starsGroup.visible = false;
+            }
+          }
+          return;
+        }
+
+        if (ped.hostile && !state.isArrested && !state.isDowned && !state.inVehicle) {
+          const dx = player.position.x - ped.mesh.position.x;
+          const dz = player.position.z - ped.mesh.position.z;
+          const dist = Math.hypot(dx, dz);
+          const ang = Math.atan2(dx, dz);
+          ped.mesh.rotation.y = ang;
+
+          if (dist > 2.2) {
+            ped.mesh.position.x += Math.sin(ang) * 9.5 * dt;
+            ped.mesh.position.z += Math.cos(ang) * 9.5 * dt;
+          } else {
+            ped.attackCooldown -= dt;
+            if (ped.attackCooldown <= 0) {
+              ped.attackCooldown = 1.1;
+              ped.mesh.userData.armR.rotation.x = -Math.PI / 2;
+              sound.punch();
+              damagePlayer(18, 'Você levou uma surra dos gatos na rua!');
+              showToast('🐾 O gato revidou o murro em você! (-18% Vida)');
+            }
+          }
+        } else {
+          ped.mesh.position.x += Math.sin(ped.dir) * ped.speed * dt;
+          ped.mesh.position.z += Math.cos(ped.dir) * ped.speed * dt;
+          ped.mesh.rotation.y = ped.dir;
+          if (Math.abs(ped.mesh.position.x) > 150 || Math.abs(ped.mesh.position.z) > 150 || Math.random() < 0.01) {
+            ped.dir += (Math.random() - 0.5) * 2.2;
+          }
+        }
+
+        const pSwing = Math.sin(elapsed * 8 + ped.dir) * 0.5;
+        ped.mesh.userData.legL.rotation.x = pSwing;
+        ped.mesh.userData.legR.rotation.x = -pSwing;
+      });
+
+      // Animação do Resgate da Ambulância do SAMU 192 (vai até o gato, socorrista sai do carro, pega e leva ao hospital)
+      if (samuRescue.active && samuRescue.targetPed) {
+        const victim = samuRescue.targetPed;
+        ambSiren.visible = Math.sin(elapsed * 16) > 0;
+
+        if (samuRescue.stage === 'driving_to_victim') {
+          const dx = victim.mesh.position.x - samuAmbulance.position.x;
+          const dz = victim.mesh.position.z - samuAmbulance.position.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist > 7.5) {
+            const ang = Math.atan2(dx, dz);
+            samuAmbulance.rotation.y = ang;
+            samuAmbulance.position.x += Math.sin(ang) * 28 * dt;
+            samuAmbulance.position.z += Math.cos(ang) * 28 * dt;
+          } else {
+            // Ambulância chegou perto: socorrista sai da ambulância!
+            samuRescue.stage = 'medic_walking';
+            samuMedic.visible = true;
+            samuMedic.position.set(
+              samuAmbulance.position.x + 2.6,
+              0,
+              samuAmbulance.position.z
+            );
+            showToast('🚑 O socorrista do SAMU saiu da ambulância para pegar o gato!');
+          }
+        } else if (samuRescue.stage === 'medic_walking') {
+          const dx = victim.mesh.position.x - samuMedic.position.x;
+          const dz = victim.mesh.position.z - samuMedic.position.z;
+          const dist = Math.hypot(dx, dz);
+          const ang = Math.atan2(dx, dz);
+          samuMedic.rotation.y = ang;
+          samuMedic.position.x += Math.sin(ang) * 10 * dt;
+          samuMedic.position.z += Math.cos(ang) * 10 * dt;
+
+          const mSwing = Math.sin(elapsed * 12) * 0.6;
+          samuMedic.userData.legL.rotation.x = mSwing;
+          samuMedic.userData.legR.rotation.x = -mSwing;
+
+          if (dist < 2.2) {
+            // Socorrista pegou o gato e colocou dentro da ambulância
+            victim.mesh.visible = false;
+            samuMedic.visible = false;
+            samuRescue.stage = 'driving_to_hospital';
+            showToast('🏥 Socorrista pegou o gato e está levando para o Hospital do SAMU!');
+          }
+        } else if (samuRescue.stage === 'driving_to_hospital') {
+          const hospX = -108;
+          const hospZ = 56;
+          const dx = hospX - samuAmbulance.position.x;
+          const dz = hospZ - samuAmbulance.position.z;
+          const dist = Math.hypot(dx, dz);
+          if (dist > 4.5) {
+            const ang = Math.atan2(dx, dz);
+            samuAmbulance.rotation.y = ang;
+            samuAmbulance.position.x += Math.sin(ang) * 28 * dt;
+            samuAmbulance.position.z += Math.cos(ang) * 28 * dt;
+          } else {
+            // Chegou no Hospital do SAMU e recuperou o gato
+            victim.knockedOut = false;
+            victim.hostile = false;
+            victim.hp = 100;
+            victim.mesh.visible = true;
+            victim.mesh.rotation.x = 0;
+            victim.mesh.position.set(-96, 0, 52);
+            victim.mesh.userData.starsGroup.visible = false;
+            samuRescue.active = false;
+            samuRescue.stage = 'idle';
+            samuRescue.targetPed = null;
+            ambSiren.visible = true;
+            showToast('🏥 O gato atropelado foi atendido no Hospital do SAMU 192!');
+          }
+        }
+      } else {
+        ambSiren.visible = true;
+      }
+
+      // Giroflex das viaturas da PF & Perseguição (carro chega perto e agentes desembarcam!)
+      const targetPos = state.inVehicle ? state.inVehicle.mesh.position : player.position;
+      let pfCarNearTarget = false;
+      let nearestPFCarPos = null;
+
+      vehicles.forEach(v => {
+        if (v.isPolice && v.mesh.userData.sirenR) {
+          const flash = Math.sin(elapsed * 14) > 0;
+          v.mesh.userData.sirenR.visible = state.wanted === 0 || flash;
+          v.mesh.userData.sirenB.visible = state.wanted === 0 || !flash;
+
+          if (state.wanted > 0 && v !== state.inVehicle && !state.isArrested && !state.isDowned && !state.inWarningDialog) {
+            const dx = targetPos.x - v.mesh.position.x;
+            const dz = targetPos.z - v.mesh.position.z;
+            const dist = Math.hypot(dx, dz);
+            if (dist > 8.5) {
+              const ang = Math.atan2(dx, dz);
+              v.mesh.rotation.y = ang;
+              const chaseSpd = v.isTruck ? 20 : 26;
+              v.mesh.position.x += Math.sin(ang) * chaseSpd * dt;
+              v.mesh.position.z += Math.cos(ang) * chaseSpd * dt;
+            } else {
+              // Viatura chegou perto: para e desembarca os agentes da PF!
+              pfCarNearTarget = true;
+              nearestPFCarPos = v.mesh.position;
+            }
+          }
+        }
+      });
+
+      // Agentes da Polícia Federal saem do carro quando chegam perto e abordam o jogador
+      pfOfficers.forEach((off, idx) => {
+        if (state.wanted > 0 && !state.isArrested && !state.isDowned && !state.inWarningDialog) {
+          if (pfCarNearTarget && nearestPFCarPos && off.position.distanceTo(targetPos) > 18) {
+            // Desembarca ao lado da viatura que acabou de encostar
+            off.position.set(
+              nearestPFCarPos.x + (idx % 2 === 0 ? -2.8 : 2.8),
+              0,
+              nearestPFCarPos.z + (idx - 1.5) * 2
+            );
+          }
+
+          const dx = targetPos.x - off.position.x;
+          const dz = targetPos.z - off.position.z;
+          const dist = Math.hypot(dx, dz);
+          const ang = Math.atan2(dx, dz);
+          off.rotation.y = ang;
+          off.position.x += Math.sin(ang) * 12.5 * dt;
+          off.position.z += Math.cos(ang) * 12.5 * dt;
+
+          const sw = Math.sin(elapsed * 12 + idx) * 0.55;
+          off.userData.legL.rotation.x = sw;
+          off.userData.legR.rotation.x = -sw;
+
+          if (dist < 2.8) {
+            arrestPlayer();
+          }
+        }
+      });
+
+      // Avião da Polícia Federal no céu
+      state.planeAngle += 0.35 * dt;
+      if (state.wanted > 0) {
+        pfPlane.position.x = targetPos.x + Math.cos(state.planeAngle * 1.6) * 48;
+        pfPlane.position.z = targetPos.z + Math.sin(state.planeAngle * 1.6) * 48;
+        pfPlane.position.y = 36;
+        pfPlane.rotation.y = -state.planeAngle * 1.6;
+      } else {
+        pfPlane.position.x = Math.cos(state.planeAngle) * 150;
+        pfPlane.position.z = -50 + Math.sin(state.planeAngle) * 150;
+        pfPlane.position.y = 62;
+        pfPlane.rotation.y = -state.planeAngle;
+      }
+
+      // Checkpoints Dourados
+      checkpoints.forEach(cp => {
+        cp.rotation.z += 2.2 * dt;
+        if (cp.position.distanceTo(targetPos) < 4.5) {
+          state.money += 500;
+          state.checkpointsCount += 1;
+          sound.coin();
+          updateHUD();
+          showToast('💰 +R$ 500! Checkpoint de Brasília concluído!');
+          cp.position.set((Math.random() - 0.5) * 200, 1.2, (Math.random() - 0.5) * 200);
+        }
+      });
+
+      // Câmera seguindo o Gato Frajola ou o Carro
+      const activeObj = state.inVehicle ? state.inVehicle.mesh : player;
+      const camDist = state.insideHouse ? 7.5 : (state.cameraMode === 0 ? (state.inVehicle ? 13 : 9.5) : 24);
+      const camHeight = state.insideHouse ? 4.8 : (state.cameraMode === 0 ? (state.inVehicle ? 5.8 : 4.5) : 14);
+      const desiredCamX = activeObj.position.x - Math.sin(activeObj.rotation.y) * camDist;
+      const desiredCamZ = activeObj.position.z - Math.cos(activeObj.rotation.y) * camDist;
+
+      camera.position.lerp(new THREE.Vector3(desiredCamX, activeObj.position.y + camHeight, desiredCamZ), 0.14);
+      camera.lookAt(activeObj.position.x, activeObj.position.y + 2.2, activeObj.position.z);
+
+      // Verificação de proximidade com a Porta da Casa e Interações Internas (Pai Noversal, Comida, Meu Quarto)
+      const houseActionBox = document.getElementById('houseActionBox');
+      const btnHouseAction = document.getElementById('btnHouseAction');
+      if (!state.insideHouse) {
+        const distDoor = Math.hypot(activeObj.position.x - (-820), activeObj.position.z - (-824.8));
+        if (distDoor < 5.5) {
+          state.houseActionType = 'enter_house';
+          btnHouseAction.textContent = '🚪 ENTRAR NA MINHA CASA';
+          houseActionBox.classList.remove('hidden');
+        } else {
+          state.houseActionType = null;
+          houseActionBox.classList.add('hidden');
+        }
+      } else {
+        drawHouseMiniMap();
+        if (fatherNoversalMesh) {
+          fatherNoversalMesh.userData.armR.rotation.x = -0.6 + Math.sin(elapsed * 6) * 0.25;
+        }
+        const distNoversal = Math.hypot(player.position.x - (INTERIOR_ORIGIN.x - 12.5), player.position.z - (INTERIOR_ORIGIN.z + 6.5));
+        const distFood = Math.hypot(player.position.x - (INTERIOR_ORIGIN.x - 8), player.position.z - (INTERIOR_ORIGIN.z + 3.5));
+        const distGamerSetup = Math.hypot(player.position.x - (INTERIOR_ORIGIN.x + 9.5), player.position.z - (INTERIOR_ORIGIN.z - 10));
+        const distExitDoor = Math.hypot(player.position.x - INTERIOR_ORIGIN.x, player.position.z - (INTERIOR_ORIGIN.z + 13.8));
+
+        if (distNoversal < 3.6) {
+          state.houseActionType = 'talk_noversal';
+          btnHouseAction.textContent = '👨‍🍳 FALAR COM PAI NOVERSAL';
+          houseActionBox.classList.remove('hidden');
+        } else if (distFood < 3.6 && state.foodReady) {
+          state.houseActionType = 'eat_food';
+          btnHouseAction.textContent = '🍛 PEGAR E COMER COMIDA (+VIDA)';
+          houseActionBox.classList.remove('hidden');
+        } else if (distGamerSetup < 4.5) {
+          state.houseActionType = 'play_game';
+          btnHouseAction.textContent = '🎮 JOGAR JOGO NO MEU QUARTO';
+          houseActionBox.classList.remove('hidden');
+        } else if (distExitDoor < 3.4) {
+          state.houseActionType = 'exit_house';
+          btnHouseAction.textContent = '🚪 SAIR DA CASA (MONTANHA)';
+          houseActionBox.classList.remove('hidden');
+        } else {
+          state.houseActionType = null;
+          houseActionBox.classList.add('hidden');
+        }
+      }
+
+      renderer.render(scene, camera);
+    }
+
+    // =========================================================================
+    // 10. PROGRESSO DO CARREGAMENTO E INÍCIO AUTOMÁTICO DO JOGO
+    // =========================================================================
+    function startGame() {
+      if (state.loaded) return;
+      state.loaded = true;
+      document.getElementById('loadingScreen').classList.add('hidden');
+      document.getElementById('gameHUD').classList.remove('hidden');
+      updateHUD();
+      showToast('🇧🇷 Bem-vindo ao GTA Brasília v1.0! Explore o Eixo Monumental!');
+    }
+
+    document.getElementById('btnSkipLoad').addEventListener('click', startGame);
+
+    let loadProg = 0;
+    const loadInterval = setInterval(() => {
+      loadProg += 12;
+      if (loadProg >= 100) {
+        loadProg = 100;
+        clearInterval(loadInterval);
+        setTimeout(startGame, 250);
+      }
+      document.getElementById('loadingBar').style.width = `${loadProg}%`;
+      document.getElementById('loadingPercent').textContent = `${loadProg}%`;
+    }, 180);
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth / window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+
+    window.onload = function () {
+      animate();
+    };
+  </script>
+</body>
+</html>
